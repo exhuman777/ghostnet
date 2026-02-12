@@ -1,2 +1,666 @@
 <!DOCTYPE html>
-<html><head><meta http-equiv="refresh" content="0; url=chat.html"></head></html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GHOSTNET — Ephemeral Encrypted Chat on Arkiv L3</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --g: #00ff41; --gd: #00cc33; --gg: #00ff4122; --bg: #0a0a0a; --bg2: #111; --bg3: #1a1a1a;
+    --dim: #333; --mid: #555; --txt: #888; --white: #e0e0e0; --blue: #6688cc;
+  }
+  html { scroll-behavior:smooth; }
+  body { font-family:'JetBrains Mono',monospace; background:var(--bg); color:var(--txt); min-height:100vh; line-height:1.7; }
+  ::selection { background:var(--g); color:var(--bg); }
+  a { color:var(--gd); text-decoration:none; }
+  a:hover { color:var(--g); text-decoration:underline; }
+
+  /* Scanlines */
+  .scanlines::after {
+    content:''; position:fixed; inset:0; z-index:9999; pointer-events:none;
+    background:repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,65,0.012) 2px, rgba(0,255,65,0.012) 4px);
+  }
+  .crt::before {
+    content:''; position:fixed; inset:0; z-index:9998; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.5) 100%);
+  }
+
+  .glow { text-shadow:0 0 10px var(--g), 0 0 20px rgba(0,255,65,0.3); }
+  .glow-sm { text-shadow:0 0 5px rgba(0,255,65,0.4); }
+  .pulse { animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+  .fade-in { animation:fadeIn .3s ease-out; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--dim); }
+  ::-webkit-scrollbar-thumb:hover { background:var(--g); }
+
+  /* Layout */
+  .container { max-width:800px; margin:0 auto; padding:0 24px; }
+  section { padding:80px 0; border-bottom:1px solid var(--dim); }
+  section:last-child { border-bottom:none; }
+
+  /* Section headers */
+  .sec-head {
+    font-size:11px; letter-spacing:3px; color:var(--g); margin-bottom:32px;
+    padding-bottom:12px; border-bottom:1px solid var(--dim);
+  }
+  .sec-head span { color:var(--mid); }
+
+  /* Code blocks */
+  .code-block {
+    background:var(--bg2); border:1px solid var(--dim); margin:16px 0; overflow-x:auto;
+    position:relative; transition:border-color .2s;
+  }
+  .code-block:hover { border-color:var(--gd); }
+  .code-header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 16px; border-bottom:1px solid var(--dim); background:var(--bg3);
+    font-size:10px; letter-spacing:1px; color:var(--mid);
+  }
+  .code-header .lang { color:var(--gd); }
+  .code-copy {
+    all:unset; cursor:pointer; font-size:10px; color:var(--mid); letter-spacing:1px;
+    padding:2px 8px; border:1px solid transparent; transition:all .15s;
+  }
+  .code-copy:hover { color:var(--g); border-color:var(--g); }
+  .code-body {
+    padding:16px; font-size:12px; line-height:1.8; color:var(--white);
+    white-space:pre; overflow-x:auto; tab-size:2;
+  }
+  .code-body .c { color:var(--mid); }      /* comment */
+  .code-body .k { color:var(--g); }        /* keyword/command */
+  .code-body .s { color:#f0c674; }         /* string */
+  .code-body .f { color:var(--blue); }     /* flag */
+  .code-body .v { color:#cc6699; }         /* variable */
+  .code-body .d { color:var(--mid); }      /* dim */
+  .code-body .o { color:var(--gd); }       /* output/result */
+
+  /* Inline code */
+  code {
+    background:var(--bg2); border:1px solid var(--dim); padding:2px 6px;
+    font-size:12px; color:var(--gd);
+  }
+
+  /* Feature grid */
+  .feat-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:24px 0; }
+  .feat-card {
+    padding:16px; border:1px solid var(--dim); background:var(--bg2); transition:all .15s;
+  }
+  .feat-card:hover { border-color:var(--gd); box-shadow:0 0 15px rgba(0,255,65,0.05); }
+  .feat-num { color:var(--gd); font-size:10px; margin-bottom:4px; }
+  .feat-title { color:var(--white); font-size:12px; margin-bottom:4px; }
+  .feat-desc { color:var(--mid); font-size:10px; line-height:1.5; }
+
+  /* Nav */
+  .topnav {
+    position:fixed; top:0; left:0; right:0; z-index:100;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:12px 24px; border-bottom:1px solid var(--dim); background:rgba(10,10,10,.95);
+    backdrop-filter:blur(10px);
+  }
+  .topnav-logo { display:flex; align-items:center; gap:8px; }
+  .topnav-links { display:flex; gap:16px; font-size:10px; letter-spacing:1px; }
+  .topnav-links a { color:var(--mid); }
+  .topnav-links a:hover { color:var(--g); text-decoration:none; }
+
+  /* CTA button */
+  .btn {
+    display:inline-block; padding:10px 24px; border:1px solid var(--g); background:transparent;
+    color:var(--g); font-family:inherit; font-size:12px; cursor:pointer; text-transform:uppercase;
+    letter-spacing:2px; transition:all .15s; text-decoration:none;
+  }
+  .btn:hover { background:var(--g); color:var(--bg); text-shadow:none; text-decoration:none; }
+  .btn-sm { padding:6px 14px; font-size:10px; letter-spacing:1px; }
+  .btn-ghost { border-color:var(--dim); color:var(--mid); }
+  .btn-ghost:hover { border-color:var(--g); color:var(--g); background:transparent; }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background:var(--bg2); border:1px solid var(--dim); padding:24px;
+    font-size:11px; line-height:1.5; color:var(--mid); overflow-x:auto; white-space:pre;
+    margin:24px 0;
+  }
+  .arch-diagram .h { color:var(--g); }
+  .arch-diagram .b { color:var(--gd); }
+  .arch-diagram .w { color:var(--white); }
+  .arch-diagram .y { color:#f0c674; }
+  .arch-diagram .p { color:#cc6699; }
+
+  /* Tags */
+  .tag {
+    display:inline-block; font-size:10px; padding:3px 10px;
+    border:1px solid var(--dim); color:var(--mid); letter-spacing:1px;
+  }
+  .tag-g { border-color:var(--gd); color:var(--gd); }
+
+  /* Step list */
+  .steps { margin:24px 0; }
+  .step {
+    display:flex; gap:16px; padding:16px 0; border-bottom:1px solid rgba(51,51,51,0.5);
+  }
+  .step:last-child { border-bottom:none; }
+  .step-n { color:var(--gd); font-size:16px; min-width:32px; }
+  .step-body { flex:1; }
+  .step-title { color:var(--white); font-size:12px; margin-bottom:4px; }
+  .step-desc { color:var(--mid); font-size:11px; }
+
+  @media (max-width:640px) {
+    .feat-grid { grid-template-columns:1fr; }
+    .topnav-links { gap:10px; }
+    .hero-ascii { font-size:6px !important; }
+  }
+</style>
+</head>
+<body class="scanlines crt">
+
+<!-- ==================== NAV ==================== -->
+<nav class="topnav">
+  <div class="topnav-logo">
+    <span class="pulse" style="display:inline-block;width:6px;height:6px;background:var(--g);border-radius:50%"></span>
+    <span style="font-size:11px;letter-spacing:4px;color:var(--gd)">GHOSTNET</span>
+  </div>
+  <div class="topnav-links">
+    <a href="#install">INSTALL</a>
+    <a href="#cli">CLI</a>
+    <a href="#claude">CLAUDE</a>
+    <a href="#arch">ARCH</a>
+    <a href="#use-cases">USE CASES</a>
+    <a href="chat.html" class="btn btn-sm" style="margin-left:8px">LAUNCH APP</a>
+  </div>
+</nav>
+
+<!-- ==================== HERO ==================== -->
+<section style="padding-top:120px;text-align:center;border-bottom:1px solid var(--dim)">
+  <div class="container">
+    <pre class="glow hero-ascii" style="font-size:10px;line-height:1.3;color:var(--g);display:inline-block;text-align:left;margin-bottom:12px">
+ ██████╗ ██╗  ██╗ ██████╗ ███████╗████████╗███╗   ██╗███████╗████████╗
+██╔════╝ ██║  ██║██╔═══██╗██╔════╝╚══██╔══╝████╗  ██║██╔════╝╚══██╔══╝
+██║  ███╗███████║██║   ██║███████╗   ██║   ██╔██╗ ██║█████╗     ██║
+██║   ██║██╔══██║██║   ██║╚════██║   ██║   ██║╚██╗██║██╔══╝     ██║
+╚██████╔╝██║  ██║╚██████╔╝███████║   ██║   ██║ ╚████║███████╗   ██║
+ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝╚══════╝   ╚═╝</pre>
+
+    <p style="font-size:13px;color:var(--txt);margin-bottom:8px;line-height:1.6">
+      EPHEMERAL ENCRYPTED CHAT ROOMS THAT SELF-DESTRUCT
+    </p>
+    <p style="font-size:11px;color:var(--mid);margin-bottom:32px">
+      NO SERVERS. NO ACCOUNTS. NO TRACE.
+    </p>
+
+    <div style="display:flex;justify-content:center;gap:4px;margin-bottom:40px;flex-wrap:wrap">
+      <span class="tag">AES-256-GCM</span>
+      <span class="tag">ON-CHAIN</span>
+      <span class="tag">AUTO DESTRUCT</span>
+      <span class="tag">ZERO SERVER</span>
+      <span class="tag">CLI + WEB</span>
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:24px">
+      <a href="chat.html" class="btn">LAUNCH WEB APP</a>
+      <a href="#install" class="btn btn-ghost">INSTALL CLI</a>
+    </div>
+
+    <div class="code-block" style="max-width:540px;margin:24px auto 0;text-align:left">
+      <div class="code-header"><span class="lang">BASH</span><span style="color:var(--dim)">quick start</span></div>
+      <div class="code-body"><span class="k">npm</span> install -g ghostnet
+<span class="k">ghostnet</span> wallet              <span class="c"># generate wallet</span>
+<span class="k">ghostnet</span> create <span class="f">--name</span>=<span class="s">"ops"</span> <span class="f">--pass</span>=<span class="s">"secret"</span> <span class="f">--ttl</span>=<span class="s">1</span>
+<span class="o">Room created: ops
+  roomId: a1b2c3d4-...
+Share: --room=a1b2c3d4-...</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== INSTALL ==================== -->
+<section id="install">
+  <div class="container">
+    <div class="sec-head">// INSTALL <span>— get ghostnet running</span></div>
+
+    <p style="margin-bottom:24px;font-size:12px">
+      GhostNet runs as a <span style="color:var(--white)">CLI tool</span>, a <span style="color:var(--white)">web app</span>, or a <span style="color:var(--white)">Claude Code skill</span>. Pick your interface.
+    </p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang">BASH</span><button class="code-copy" onclick="copy(this)">COPY</button></div>
+      <div class="code-body"><span class="c"># Option 1: Install globally from npm</span>
+<span class="k">npm</span> install -g ghostnet
+
+<span class="c"># Option 2: Clone and build from source</span>
+<span class="k">git</span> clone https://github.com/exhuman777/ghostnet.git
+<span class="k">cd</span> ghostnet
+<span class="k">npm</span> install
+<span class="k">npm</span> run build</div>
+    </div>
+
+    <p style="margin:24px 0 12px;font-size:11px;color:var(--gd);letter-spacing:1px">WALLET SETUP</p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang">BASH</span><button class="code-copy" onclick="copy(this)">COPY</button></div>
+      <div class="code-body"><span class="c"># Generate a new wallet</span>
+<span class="k">ghostnet</span> wallet
+
+<span class="o">Generated wallet:
+  Address:     0x1a2B3c4D...
+  Private key: 0x1a2B...3c4D
+
+Full key: pipe to file with > ghostnet-wallet.txt
+Fund at: https://mendoza.hoodi.arkiv.network/faucet/
+
+Export: GHOSTNET_PRIVATE_KEY=0x...</span>
+
+<span class="c"># Export your key (add to ~/.bashrc or ~/.zshrc)</span>
+<span class="k">export</span> <span class="v">GHOSTNET_PRIVATE_KEY</span>=<span class="s">0xYOUR_PRIVATE_KEY</span>
+
+<span class="c"># Fund your wallet with testnet ETH</span>
+<span class="k">open</span> https://mendoza.hoodi.arkiv.network/faucet/</div>
+    </div>
+
+    <div style="margin-top:24px;padding:16px;border:1px solid var(--dim);background:var(--bg2)">
+      <div style="font-size:10px;color:var(--gd);margin-bottom:8px;letter-spacing:1px">WEB APP</div>
+      <p style="font-size:11px;color:var(--mid)">
+        No install needed. Open <a href="chat.html">chat.html</a> in any browser. Connect MetaMask, get testnet ETH from the faucet, and start chatting. Mendoza chain auto-adds to MetaMask on first connect.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== CLI ==================== -->
+<section id="cli">
+  <div class="container">
+    <div class="sec-head">// CLI REFERENCE <span>— terminal commands</span></div>
+
+    <p style="margin-bottom:24px;font-size:12px">
+      All commands. All flags. Run <code>ghostnet</code> with no args for help.
+    </p>
+
+    <p style="margin-bottom:8px;font-size:10px;color:var(--gd);letter-spacing:1px">CREATE A ROOM</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">BASH</span><button class="code-copy" onclick="copy(this)">COPY</button></div>
+      <div class="code-body"><span class="k">ghostnet</span> create <span class="f">--name</span>=<span class="s">"war-room"</span> <span class="f">--pass</span>=<span class="s">"hunter2"</span> <span class="f">--ttl</span>=<span class="s">6</span> <span class="f">--nick</span>=<span class="s">"ghost"</span>
+
+<span class="o">Room created: war-room
+  roomId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  entity: 0x...
+  tx:     0x...
+  TTL:    6h
+
+Share: --room=a1b2c3d4-...
+(share passphrase separately via secure channel)</span></div>
+    </div>
+
+    <p style="margin:24px 0 8px;font-size:10px;color:var(--gd);letter-spacing:1px">SEND A MESSAGE</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">BASH</span><button class="code-copy" onclick="copy(this)">COPY</button></div>
+      <div class="code-body"><span class="k">ghostnet</span> send <span class="f">--room</span>=<span class="s">ROOM_ID</span> <span class="f">--pass</span>=<span class="s">"hunter2"</span> <span class="f">--nick</span>=<span class="s">"ghost"</span> <span class="f">--msg</span>=<span class="s">"exfil complete"</span>
+
+<span class="o">Sent as ghost: exfil complete
+  entity: 0x...
+  tx:     0x...</span></div>
+    </div>
+
+    <p style="margin:24px 0 8px;font-size:10px;color:var(--gd);letter-spacing:1px">READ MESSAGES</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">BASH</span><button class="code-copy" onclick="copy(this)">COPY</button></div>
+      <div class="code-body"><span class="k">ghostnet</span> read <span class="f">--room</span>=<span class="s">ROOM_ID</span> <span class="f">--pass</span>=<span class="s">"hunter2"</span>
+
+<span class="o">Room: war-room (TTL: 6h, by ghost)
+[14:23:01] ghost: exfil complete
+[14:23:45] specter: confirmed. go dark.
+[14:24:12] ghost: ack. self-destruct in 5h58m</span></div>
+    </div>
+
+    <p style="margin:24px 0 8px;font-size:10px;color:var(--gd);letter-spacing:1px">LIST ACTIVE ROOMS</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">BASH</span><button class="code-copy" onclick="copy(this)">COPY</button></div>
+      <div class="code-body"><span class="k">ghostnet</span> rooms
+
+<span class="o">┌─────────┬──────────────────┬────────┬──────┬─────┬────────────────────┐
+│ (index) │ roomId           │ name   │ by   │ ttl │ created            │
+├─────────┼──────────────────┼────────┼──────┼─────┼────────────────────┤
+│ 0       │ a1b2c3d4-...     │ ops    │ anon │ 1h  │ 2/12/2026, 2:00 PM │
+│ 1       │ deadbeef-...     │ debug  │ dev  │ 12h │ 2/12/2026, 8:00 AM │
+└─────────┴──────────────────┴────────┴──────┴─────┴────────────────────┘</span></div>
+    </div>
+
+    <p style="margin:24px 0 8px;font-size:10px;color:var(--gd);letter-spacing:1px">ALL FLAGS</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">REFERENCE</span></div>
+      <div class="code-body"><span class="d">COMMAND   FLAGS                                DESCRIPTION</span>
+<span class="d">───────── ──────────────────────────────────── ───────────────────────</span>
+<span class="k">create</span>    <span class="f">--name</span> <span class="f">--pass</span> <span class="f">--ttl</span> <span class="f">--nick</span>           Create encrypted room
+<span class="k">send</span>      <span class="f">--room</span> <span class="f">--pass</span> <span class="f">--nick</span> <span class="f">--msg</span>          Send encrypted message
+<span class="k">read</span>      <span class="f">--room</span> <span class="f">--pass</span> <span class="f">[--limit]</span>               Read + decrypt messages
+<span class="k">rooms</span>     <span class="f">[--limit]</span>                             List active rooms
+<span class="k">wallet</span>                                         Generate new wallet
+<span class="k">chat</span>                                           Show web UI path
+
+<span class="d">ENVIRONMENT</span>
+<span class="d">───────────────────────────────────────────────────────────────────</span>
+<span class="v">GHOSTNET_PRIVATE_KEY</span>   Wallet private key (or use <span class="f">--key</span>)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== CLAUDE CODE ==================== -->
+<section id="claude">
+  <div class="container">
+    <div class="sec-head">// CLAUDE CODE SKILL <span>— AI-native chat ops</span></div>
+
+    <p style="margin-bottom:24px;font-size:12px">
+      GhostNet ships as a <span style="color:var(--white)">Claude Code slash command</span>. Create rooms, send messages,
+      and coordinate agents — all from your AI coding assistant.
+    </p>
+
+    <p style="margin-bottom:8px;font-size:10px;color:var(--gd);letter-spacing:1px">INSTALL THE SKILL</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">BASH</span><button class="code-copy" onclick="copy(this)">COPY</button></div>
+      <div class="code-body"><span class="c"># Create the command file</span>
+<span class="k">mkdir</span> -p ~/.claude/commands
+<span class="k">cp</span> ~/ghostnet/ghostnet.md ~/.claude/commands/ghostnet.md
+
+<span class="c"># Set your wallet key</span>
+<span class="k">export</span> <span class="v">GHOSTNET_PRIVATE_KEY</span>=<span class="s">0xYOUR_KEY</span></div>
+    </div>
+
+    <p style="margin:24px 0 8px;font-size:10px;color:var(--gd);letter-spacing:1px">USAGE IN CLAUDE CODE</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">CLAUDE CODE</span><span style="color:var(--dim)">natural language</span></div>
+      <div class="code-body"><span class="d">you&gt;</span>  <span class="s">/ghostnet create a room for incident response, 3h TTL</span>
+
+<span class="d">claude&gt;</span> <span class="o">Created room "incident-response"
+  roomId: 7f3a2b1c-...
+  TTL: 3h
+
+Share room ID with team. Share passphrase separately (verbal/secure channel).</span>
+
+<span class="d">───────────────────────────────────────────────────────────────</span>
+
+<span class="d">you&gt;</span>  <span class="s">/ghostnet send status update to the incident room</span>
+
+<span class="d">claude&gt;</span> <span class="o">Sent to incident-response:
+  "Status: API restored, monitoring for 30min before all-clear"
+  Delivered on-chain (tx: 0x...)</span>
+
+<span class="d">───────────────────────────────────────────────────────────────</span>
+
+<span class="d">you&gt;</span>  <span class="s">/ghostnet read the incident room</span>
+
+<span class="d">claude&gt;</span> <span class="o">Room: incident-response (TTL: 2h41m remaining)
+[14:01] ops:    root cause identified — bad deploy at 13:42
+[14:15] dev:    rollback complete, healthchecks green
+[14:23] ops:    Status: API restored, monitoring for 30min</span></div>
+    </div>
+
+    <p style="margin:24px 0 8px;font-size:10px;color:var(--gd);letter-spacing:1px">SKILL CAPABILITIES</p>
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-num">01</div>
+        <div class="feat-title">CREATE ROOMS</div>
+        <div class="feat-desc">Natural language room creation with auto-generated passphrases and sensible TTL defaults</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num">02</div>
+        <div class="feat-title">SEND MESSAGES</div>
+        <div class="feat-desc">Send encrypted on-chain messages from Claude. Every send is a signed transaction</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num">03</div>
+        <div class="feat-title">READ + DECRYPT</div>
+        <div class="feat-desc">Fetch and decrypt room messages. Wrong passphrase = zero visibility</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-num">04</div>
+        <div class="feat-title">AGENT COORDINATION</div>
+        <div class="feat-desc">Multi-agent task rooms with auto-expiry. Agents create, communicate, and clean up</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== ARCHITECTURE ==================== -->
+<section id="arch">
+  <div class="container">
+    <div class="sec-head">// ARCHITECTURE <span>— how it works</span></div>
+
+    <div class="arch-diagram"><span class="h">GHOSTNET SYSTEM ARCHITECTURE</span>
+
+<span class="w">  CLIENTS                       ARKIV L3                    CRYPTO</span>
+<span class="b"> ┌─────────────┐</span>           <span class="b">┌─────────────────┐</span>      <span class="b">┌──────────────────┐</span>
+<span class="b"> │</span> <span class="y">WEB APP</span>       <span class="b">│</span>           <span class="b">│</span>                 <span class="b">│</span>      <span class="b">│</span>                  <span class="b">│</span>
+<span class="b"> │</span> chat.html     <span class="b">│──┐</span>        <span class="b">│</span>  <span class="h">MENDOZA</span>        <span class="b">│</span>      <span class="b">│</span>  passphrase       <span class="b">│</span>
+<span class="b"> │</span> MetaMask      <span class="b">│  │</span>        <span class="b">│</span>  <span class="h">TESTNET</span>        <span class="b">│</span>      <span class="b">│</span>     <span class="w">│</span>              <span class="b">│</span>
+<span class="b"> └─────────────┘  │</span>        <span class="b">│</span>                 <span class="b">│</span>      <span class="b">│</span>     <span class="w">▼</span>              <span class="b">│</span>
+                  <span class="b">│</span>        <span class="b">│</span>  <span class="w">Entities</span>       <span class="b">│</span>      <span class="b">│</span>  <span class="y">PBKDF2</span>           <span class="b">│</span>
+<span class="b"> ┌─────────────┐  ├───────▶│</span>  <span class="w">+ Attributes</span>   <span class="b">│</span>      <span class="b">│</span>  <span class="w">100k iterations</span>  <span class="b">│</span>
+<span class="b"> │</span> <span class="y">CLI</span>           <span class="b">│  │</span>        <span class="b">│</span>  <span class="w">+ Payload</span>      <span class="b">│</span>      <span class="b">│</span>     <span class="w">│</span>              <span class="b">│</span>
+<span class="b"> │</span> ghostnet cmd  <span class="b">│──┤</span>        <span class="b">│</span>  <span class="w">+ TTL</span>          <span class="b">│</span>      <span class="b">│</span>     <span class="w">▼</span>              <span class="b">│</span>
+<span class="b"> │</span> node.js       <span class="b">│  │</span>        <span class="b">│</span>                 <span class="b">│</span>      <span class="b">│</span>  <span class="h">AES-256-GCM</span>      <span class="b">│</span>
+<span class="b"> └─────────────┘  │</span>        <span class="b">│</span>  <span class="p">auto-purge</span>     <span class="b">│</span>      <span class="b">│</span>  <span class="w">+ random IV</span>      <span class="b">│</span>
+                  <span class="b">│</span>        <span class="b">│</span>  <span class="p">on TTL expiry</span>  <span class="b">│</span>      <span class="b">│</span>                  <span class="b">│</span>
+<span class="b"> ┌─────────────┐  │</span>        <span class="b">└─────────────────┘</span>      <span class="b">└──────────────────┘</span>
+<span class="b"> │</span> <span class="y">CLAUDE CODE</span>   <span class="b">│  │</span>
+<span class="b"> │</span> /ghostnet     <span class="b">│──┘</span>         <span class="w">▲ write (signed tx)</span>
+<span class="b"> │</span> AI skill      <span class="b">│</span>            <span class="w">▼ read (public query)</span>
+<span class="b"> └─────────────┘</span>
+
+<span class="h">DATA FLOW</span>
+
+  <span class="w">sender</span>                                               <span class="w">receiver</span>
+    <span class="w">│</span>                                                      <span class="w">│</span>
+    <span class="w">▼</span>                                                      <span class="w">│</span>
+  <span class="y">plaintext</span> ──▶ <span class="h">AES-GCM encrypt</span> ──▶ <span class="p">ciphertext</span> ──▶ <span class="b">chain</span> ──▶ <span class="h">AES-GCM decrypt</span> ──▶ <span class="y">plaintext</span>
+    <span class="w">│</span>            <span class="w">▲</span>                                         <span class="w">▲</span>             <span class="w">│</span>
+    <span class="w">│</span>            <span class="w">│</span>                                         <span class="w">│</span>             <span class="w">│</span>
+    <span class="w">└──── passphrase + roomId ──▶ PBKDF2 ──▶ key ─────────┘</span>             <span class="w">│</span>
+                                                                       <span class="w">▼</span>
+                                                                  <span class="y">displayed</span>
+
+  <span class="d">Keys NEVER leave the client. Wrong passphrase = zero messages visible.</span>
+  <span class="d">No server. No database. No logs. Messages auto-destruct on TTL expiry.</span></div>
+
+    <p style="margin:24px 0 12px;font-size:10px;color:var(--gd);letter-spacing:1px">STACK</p>
+    <div class="code-block">
+      <div class="code-header"><span class="lang">SPEC</span></div>
+      <div class="code-body"><span class="d">COMPONENT    TECHNOLOGY                     NOTE</span>
+<span class="d">──────────── ────────────────────────────── ──────────────────────────</span>
+<span class="k">Encryption</span>   AES-256-GCM + PBKDF2           Web Crypto API (browser)
+<span class="k">Key Derive</span>   PBKDF2 SHA-256, 100k iters     passphrase + roomId = key
+<span class="k">Storage</span>      Arkiv L3 (Mendoza Testnet)     entities with TTL
+<span class="k">Transport</span>    On-chain signed transactions    MetaMask / private key
+<span class="k">Frontend</span>     Single HTML file               zero build step
+<span class="k">Backend</span>      None                           fully decentralized
+<span class="k">CLI</span>          TypeScript + Node.js           @arkiv-network/sdk
+<span class="k">AI</span>           Claude Code slash command      /ghostnet</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== USE CASES ==================== -->
+<section id="use-cases">
+  <div class="container">
+    <div class="sec-head">// USE CASES <span>— who needs ghost channels</span></div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">01</div>
+        <div class="step-body">
+          <div class="step-title">INCIDENT RESPONSE</div>
+          <div class="step-desc">
+            Create a 3h room when prod goes down. Entire team coordinates in encrypted channel.
+            No Slack history. No screenshots. Auto-destruct when resolved.
+          </div>
+          <div class="code-block" style="margin-top:12px">
+            <div class="code-header"><span class="lang">CLAUDE CODE</span></div>
+            <div class="code-body"><span class="d">you&gt;</span> <span class="s">/ghostnet create incident room, 3h, critical — db connection pool exhausted</span>
+<span class="d">you&gt;</span> <span class="s">/ghostnet send "root cause: connection leak in payment service v2.3.1"</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">02</div>
+        <div class="step-body">
+          <div class="step-title">SECURE TEAM SYNC</div>
+          <div class="step-desc">
+            Pre-meeting room with 1h TTL. Share passphrase verbally. Discuss sensitive topics.
+            Room self-destructs after the meeting window.
+          </div>
+          <div class="code-block" style="margin-top:12px">
+            <div class="code-header"><span class="lang">BASH</span></div>
+            <div class="code-body"><span class="k">ghostnet</span> create <span class="f">--name</span>=<span class="s">"board-sync"</span> <span class="f">--pass</span>=<span class="s">"verbal-only"</span> <span class="f">--ttl</span>=<span class="s">1</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">03</div>
+        <div class="step-body">
+          <div class="step-title">AI AGENT COORDINATION</div>
+          <div class="step-desc">
+            Claude Code agents create task rooms, post updates, coordinate across sessions.
+            Built-in expiry means no orphaned channels.
+          </div>
+          <div class="code-block" style="margin-top:12px">
+            <div class="code-header"><span class="lang">CLAUDE CODE</span></div>
+            <div class="code-body"><span class="d">you&gt;</span> <span class="s">/ghostnet create agent coordination room for the migration task</span>
+<span class="d">you&gt;</span> <span class="s">/ghostnet send "migration phase 1 complete — 2,847 records moved"</span>
+<span class="d">you&gt;</span> <span class="s">/ghostnet read the migration room</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">04</div>
+        <div class="step-body">
+          <div class="step-title">WHISTLEBLOWER DROPS</div>
+          <div class="step-desc">
+            Journalist creates room with 24h TTL. Source opens invite link, sends info.
+            No server logs, no IP tracking, auto-purge.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">05</div>
+        <div class="step-body">
+          <div class="step-title">CTF / HACKATHON WAR ROOMS</div>
+          <div class="step-desc">
+            Temporary encrypted channel for competition teams. Share flags, coordinate attacks,
+            auto-cleanup when the event ends.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">06</div>
+        <div class="step-body">
+          <div class="step-title">DEAD DROPS</div>
+          <div class="step-desc">
+            Create a room, post a message, share the room ID + passphrase through a separate channel.
+            Recipient reads once. Message self-destructs on TTL.
+          </div>
+          <div class="code-block" style="margin-top:12px">
+            <div class="code-header"><span class="lang">BASH</span></div>
+            <div class="code-body"><span class="k">ghostnet</span> create <span class="f">--name</span>=<span class="s">"drop"</span> <span class="f">--pass</span>=<span class="s">"$(openssl rand -hex 16)"</span> <span class="f">--ttl</span>=<span class="s">1</span>
+<span class="k">ghostnet</span> send <span class="f">--room</span>=<span class="s">ROOM_ID</span> <span class="f">--pass</span>=<span class="s">PASS</span> <span class="f">--msg</span>=<span class="s">"the credentials are..."</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SECURITY ==================== -->
+<section id="security">
+  <div class="container">
+    <div class="sec-head">// SECURITY MODEL <span>— trust nobody</span></div>
+
+    <div class="arch-diagram"><span class="h">ENCRYPTION PIPELINE</span>
+
+  <span class="y">passphrase</span> + <span class="y">roomId</span>
+       <span class="w">│</span>
+       <span class="w">▼</span>
+  ┌──────────────────────────────────────────────────┐
+  <span class="b">│</span>  <span class="h">PBKDF2</span>                                          <span class="b">│</span>
+  <span class="b">│</span>  <span class="w">iterations: 100,000</span>                              <span class="b">│</span>
+  <span class="b">│</span>  <span class="w">hash: SHA-256</span>                                    <span class="b">│</span>
+  <span class="b">│</span>  <span class="w">salt: roomId (unique per room)</span>                   <span class="b">│</span>
+  └──────────────────────────────────────────────────┘
+       <span class="w">│</span>
+       <span class="w">▼</span>
+  <span class="h">AES-256-GCM key</span>
+       <span class="w">│</span>
+       <span class="w">├──▶</span> <span class="y">encrypt</span>(plaintext, <span class="p">random 12-byte IV</span>) ──▶ ciphertext ──▶ <span class="b">on-chain</span>
+       <span class="w">│</span>
+       <span class="w">└──▶</span> <span class="y">decrypt</span>(ciphertext) ──▶ plaintext
+</div>
+
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-title" style="color:var(--g)">CLIENT-SIDE ONLY</div>
+        <div class="feat-desc">All encryption/decryption happens in your browser or CLI. Keys never leave the client. No server ever sees plaintext.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-title" style="color:var(--g)">ZERO KNOWLEDGE</div>
+        <div class="feat-desc">Wrong passphrase = zero messages visible. There is no "forgot password". No admin backdoor. No recovery.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-title" style="color:var(--g)">AUTO DESTRUCT</div>
+        <div class="feat-desc">Messages have on-chain TTL. When time expires, Arkiv L3 automatically purges all data. No manual cleanup needed.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-title" style="color:var(--g)">NO METADATA</div>
+        <div class="feat-desc">Room names and nicks are public. Message content is encrypted. No IP logging. No analytics. No tracking.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<div style="padding:40px 24px;border-top:1px solid var(--dim);text-align:center">
+  <div class="container">
+    <pre class="glow" style="font-size:8px;line-height:1.2;color:var(--g);display:inline-block;margin-bottom:16px">
+ ██████╗ ██╗  ██╗ ██████╗ ███████╗████████╗
+██╔════╝ ██║  ██║██╔═══██╗██╔════╝╚══██╔══╝
+██║  ███╗███████║██║   ██║███████╗   ██║
+██║   ██║██╔══██║██║   ██║╚════██║   ██║
+╚██████╔╝██║  ██║╚██████╔╝███████║   ██║
+ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝</pre>
+    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px">
+      <a href="chat.html" class="btn">LAUNCH APP</a>
+      <a href="https://github.com/exhuman777/ghostnet" target="_blank" class="btn btn-ghost">GITHUB</a>
+    </div>
+    <div style="font-size:9px;color:var(--mid);letter-spacing:1px;margin-top:24px">
+      <a href="https://arkiv.network" target="_blank" style="color:var(--gd)">ARKIV L3</a>
+      // <a href="https://mendoza.hoodi.arkiv.network/faucet/" target="_blank" style="color:var(--gd)">FAUCET</a>
+      // <a href="https://mendoza.hoodi.arkiv.network/" target="_blank" style="color:var(--gd)">EXPLORER</a>
+      // MIT LICENSE
+    </div>
+  </div>
+</div>
+
+<script>
+function copy(btn) {
+  const block = btn.closest('.code-block');
+  const code = block.querySelector('.code-body').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = 'COPIED';
+    setTimeout(() => btn.textContent = 'COPY', 1500);
+  });
+}
+
+// Smooth reveal on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('fade-in'); observer.unobserve(e.target); }});
+}, { threshold: 0.1 });
+document.querySelectorAll('section').forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
