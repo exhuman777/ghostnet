@@ -3,537 +3,588 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GhostNet — Ephemeral Encrypted Chat</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  theme: {
-    extend: {
-      colors: {
-        ghost: { 50:'#f0fdf4', 100:'#dcfce7', 400:'#4ade80', 500:'#22c55e', 600:'#16a34a', 900:'#0a0f0d' },
-        dark: { 800:'#111714', 900:'#090d0b', 950:'#050805' }
-      }
-    }
-  }
-}
-</script>
+<title>GHOSTNET</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-  body { font-family: 'Space Grotesk', sans-serif; background: #050805; }
-  .mono { font-family: 'JetBrains Mono', monospace; }
-  .glow { text-shadow: 0 0 20px rgba(74,222,128,0.3), 0 0 40px rgba(74,222,128,0.1); }
-  .glow-border { box-shadow: 0 0 15px rgba(74,222,128,0.1), inset 0 0 15px rgba(74,222,128,0.05); }
-  .pulse-dot { animation: pulse-dot 2s infinite; }
-  @keyframes pulse-dot { 0%,100%{opacity:.4} 50%{opacity:1} }
-  .fade-in { animation: fadeIn .3s ease-out; }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-  .scan-line { background: linear-gradient(transparent 50%, rgba(74,222,128,0.02) 50%); background-size: 100% 4px; pointer-events: none; }
-  #messages::-webkit-scrollbar { width: 4px; }
-  #messages::-webkit-scrollbar-track { background: transparent; }
-  #messages::-webkit-scrollbar-thumb { background: rgba(74,222,128,0.2); border-radius: 2px; }
-  input:focus, textarea:focus { outline: none; }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --g: #00ff41; --gd: #00cc33; --gg: #00ff4122; --bg: #0a0a0a; --bg2: #111; --bg3: #1a1a1a;
+    --dim: #333; --mid: #555; --txt: #888; --white: #e0e0e0;
+  }
+  body { font-family:'JetBrains Mono',monospace; background:var(--bg); color:var(--g); min-height:100vh; overflow:hidden; }
+  ::selection { background:var(--g); color:var(--bg); }
+  input, select, textarea { font-family:inherit; font-size:inherit; }
+  input:focus, select:focus { outline:none; }
+  a { color:var(--gd); text-decoration:none; }
+  a:hover { color:var(--g); text-decoration:underline; }
+
+  /* Scanlines */
+  .scanlines::after {
+    content:''; position:fixed; inset:0; z-index:9999; pointer-events:none;
+    background:repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,65,0.015) 2px, rgba(0,255,65,0.015) 4px);
+  }
+  /* CRT vignette */
+  .crt::before {
+    content:''; position:fixed; inset:0; z-index:9998; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+  }
+  /* Glow */
+  .glow { text-shadow:0 0 10px var(--g), 0 0 20px rgba(0,255,65,0.3); }
+  .glow-sm { text-shadow:0 0 5px rgba(0,255,65,0.4); }
+  /* Blink cursor */
+  .blink { animation:blink 1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  /* Fade in */
+  .fade-in { animation:fadeIn .2s ease-out; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  /* Pulse */
+  .pulse { animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+  /* Brutalist border */
+  .brd { border:1px solid var(--dim); }
+  .brd-g { border:1px solid var(--g); }
+  .brd-gd { border:1px solid rgba(0,255,65,0.15); }
+
+  /* Input */
+  .inp {
+    width:100%; background:var(--bg); border:1px solid var(--dim); padding:10px 12px;
+    color:var(--g); font-size:13px; transition:border-color .2s;
+  }
+  .inp:focus { border-color:var(--g); box-shadow:0 0 10px rgba(0,255,65,0.1); }
+  .inp::placeholder { color:var(--mid); }
+
+  select.inp { appearance:none; cursor:pointer; }
+
+  /* Button */
+  .btn {
+    display:inline-block; padding:10px 20px; border:1px solid var(--g); background:transparent;
+    color:var(--g); font-family:inherit; font-size:13px; cursor:pointer; text-transform:uppercase;
+    letter-spacing:2px; transition:all .15s;
+  }
+  .btn:hover { background:var(--g); color:var(--bg); text-shadow:none; }
+  .btn:disabled { opacity:.3; cursor:not-allowed; }
+  .btn:disabled:hover { background:transparent; color:var(--g); }
+  .btn-sm { padding:6px 14px; font-size:11px; letter-spacing:1px; }
+  .btn-danger { border-color:#ff4444; color:#ff4444; }
+  .btn-danger:hover { background:#ff4444; color:var(--bg); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--dim); }
+  ::-webkit-scrollbar-thumb:hover { background:var(--g); }
+
+  /* Layout helpers */
+  .hidden { display:none !important; }
+  .full { position:fixed; inset:0; }
 </style>
 </head>
-<body class="min-h-screen text-gray-300 overflow-hidden">
+<body class="scanlines crt">
 
-<!-- ========== LANDING PAGE ========== -->
-<div id="landing" class="min-h-screen flex flex-col">
-  <!-- Nav -->
-  <nav class="flex items-center justify-between px-6 py-4 border-b border-ghost-400/10">
-    <div class="flex items-center gap-2">
-      <div class="w-2 h-2 rounded-full bg-ghost-400 pulse-dot"></div>
-      <span class="mono text-ghost-400 font-semibold text-sm tracking-wider">GHOSTNET</span>
+<!-- ==================== LANDING ==================== -->
+<div id="landing" style="min-height:100vh;display:flex;flex-direction:column">
+
+  <!-- Top bar -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid var(--dim)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="pulse" style="display:inline-block;width:6px;height:6px;background:var(--g);border-radius:50%"></span>
+      <span style="font-size:11px;letter-spacing:4px;color:var(--gd)">GHOSTNET v0.1</span>
     </div>
-    <div class="flex items-center gap-4 text-xs mono text-gray-500">
-      <span>AES-256-GCM</span>
-      <span class="text-ghost-400/40">|</span>
-      <span>ARKIV L3</span>
-      <span class="text-ghost-400/40">|</span>
-      <span>ZERO SERVER</span>
-    </div>
-  </nav>
+    <div style="font-size:10px;color:var(--mid);letter-spacing:2px">AES-256 // ARKIV L3 // ZERO SERVER</div>
+  </div>
 
-  <!-- Hero -->
-  <div class="flex-1 flex items-center justify-center px-6">
-    <div class="max-w-2xl w-full text-center">
-      <div class="mb-8">
-        <h1 class="text-5xl md:text-6xl font-bold text-white glow mb-4 tracking-tight">
-          Ghost<span class="text-ghost-400">Net</span>
-        </h1>
-        <p class="text-lg text-gray-400 max-w-md mx-auto">
-          Ephemeral encrypted chat rooms that self-destruct. No servers. No accounts. No trace.
-        </p>
+  <!-- Main -->
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="max-width:640px;width:100%">
+
+      <!-- ASCII Logo -->
+      <pre class="glow" style="font-size:11px;line-height:1.3;text-align:center;margin-bottom:8px;color:var(--g)">
+  ██████╗ ██╗  ██╗ ██████╗ ███████╗████████╗███╗   ██╗███████╗████████╗
+ ██╔════╝ ██║  ██║██╔═══██╗██╔════╝╚══██╔══╝████╗  ██║██╔════╝╚══██╔══╝
+ ██║  ███╗███████║██║   ██║███████╗   ██║   ██╔██╗ ██║█████╗     ██║
+ ██║   ██║██╔══██║██║   ██║╚════██║   ██║   ██║╚██╗██║██╔══╝     ██║
+ ╚██████╔╝██║  ██║╚██████╔╝███████║   ██║   ██║ ╚████║███████╗   ██║
+  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝╚══════╝   ╚═╝</pre>
+
+      <p style="text-align:center;font-size:12px;color:var(--txt);margin-bottom:32px;line-height:1.6">
+        EPHEMERAL ENCRYPTED CHAT ROOMS THAT SELF-DESTRUCT<br>
+        <span style="color:var(--mid)">NO SERVERS. NO ACCOUNTS. NO TRACE.</span>
+      </p>
+
+      <!-- Spec bar -->
+      <div style="display:flex;justify-content:center;gap:4px;margin-bottom:40px;flex-wrap:wrap">
+        <span style="font-size:10px;padding:4px 10px;border:1px solid var(--dim);color:var(--mid)">E2E ENCRYPTED</span>
+        <span style="font-size:10px;padding:4px 10px;border:1px solid var(--dim);color:var(--mid)">AUTO DESTRUCT</span>
+        <span style="font-size:10px;padding:4px 10px;border:1px solid var(--dim);color:var(--mid)">ON-CHAIN</span>
+        <span style="font-size:10px;padding:4px 10px;border:1px solid var(--dim);color:var(--mid)">ZERO KNOWLEDGE</span>
       </div>
 
-      <!-- Feature pills -->
-      <div class="flex flex-wrap justify-center gap-2 mb-10 text-xs mono">
-        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">End-to-end encrypted</span>
-        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">Auto self-destruct</span>
-        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">On-chain storage</span>
-        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">Zero knowledge</span>
-      </div>
-
-      <!-- Action cards -->
-      <div class="grid md:grid-cols-2 gap-4 max-w-lg mx-auto">
-        <!-- Create Room -->
-        <button onclick="showCreate()" class="group p-5 rounded-xl border border-ghost-400/20 bg-dark-900/50 hover:border-ghost-400/40 hover:bg-dark-800/50 transition-all text-left glow-border">
-          <div class="text-ghost-400 text-2xl mb-2">+</div>
-          <div class="text-white font-semibold mb-1">Create Room</div>
-          <div class="text-xs text-gray-500">Start a new encrypted chat room</div>
+      <!-- Action blocks -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+        <button onclick="showCreate()" style="all:unset;cursor:pointer;display:block;padding:24px;border:1px solid var(--dim);background:var(--bg2);transition:all .15s" onmouseover="this.style.borderColor='var(--g)';this.style.boxShadow='0 0 20px rgba(0,255,65,0.1)'" onmouseout="this.style.borderColor='var(--dim)';this.style.boxShadow='none'">
+          <div style="font-size:24px;color:var(--g);margin-bottom:8px">[ + ]</div>
+          <div style="font-size:13px;color:var(--white);margin-bottom:4px">CREATE ROOM</div>
+          <div style="font-size:10px;color:var(--mid)">Initialize new encrypted channel</div>
         </button>
-        <!-- Join Room -->
-        <button onclick="showJoin()" class="group p-5 rounded-xl border border-ghost-400/20 bg-dark-900/50 hover:border-ghost-400/40 hover:bg-dark-800/50 transition-all text-left glow-border">
-          <div class="text-ghost-400 text-2xl mb-2">→</div>
-          <div class="text-white font-semibold mb-1">Join Room</div>
-          <div class="text-xs text-gray-500">Enter with room ID + passphrase</div>
+        <button onclick="showJoin()" style="all:unset;cursor:pointer;display:block;padding:24px;border:1px solid var(--dim);background:var(--bg2);transition:all .15s" onmouseover="this.style.borderColor='var(--g)';this.style.boxShadow='0 0 20px rgba(0,255,65,0.1)'" onmouseout="this.style.borderColor='var(--dim)';this.style.boxShadow='none'">
+          <div style="font-size:24px;color:var(--g);margin-bottom:8px">[ > ]</div>
+          <div style="font-size:13px;color:var(--white);margin-bottom:4px">JOIN ROOM</div>
+          <div style="font-size:10px;color:var(--mid)">Enter with room ID + passphrase</div>
         </button>
       </div>
 
-      <!-- Wallet status -->
-      <div id="wallet-status" class="mt-8 text-xs mono text-gray-600"></div>
+      <!-- Wallet -->
+      <div id="wallet-status" style="text-align:center;font-size:10px;color:var(--mid)"></div>
     </div>
   </div>
 
   <!-- Footer -->
-  <footer class="px-6 py-4 border-t border-ghost-400/5 text-center text-xs text-gray-600 mono">
-    Messages stored on <a href="https://arkiv.network" target="_blank" class="text-ghost-400/50 hover:text-ghost-400">Arkiv L3</a> — encrypted with AES-256-GCM — keys never leave your browser
-  </footer>
+  <div style="padding:16px 24px;border-top:1px solid var(--dim);text-align:center;font-size:9px;color:var(--mid);letter-spacing:1px">
+    MESSAGES ON <a href="https://arkiv.network" target="_blank" style="color:var(--gd)">ARKIV L3</a> // ENCRYPTED AES-256-GCM // KEYS NEVER LEAVE BROWSER
+  </div>
 </div>
 
-<!-- ========== CREATE ROOM MODAL ========== -->
-<div id="create-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center px-4 hidden z-50">
-  <div class="bg-dark-800 border border-ghost-400/20 rounded-xl p-6 w-full max-w-md fade-in glow-border">
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-white font-semibold">Create Room</h2>
-      <button onclick="hideModals()" class="text-gray-500 hover:text-white text-xl">&times;</button>
+<!-- ==================== CREATE MODAL ==================== -->
+<div id="create-modal" class="full hidden" style="background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50">
+  <div class="fade-in" style="background:var(--bg);border:1px solid var(--g);max-width:440px;width:100%;box-shadow:0 0 30px rgba(0,255,65,0.1)">
+    <!-- Title bar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--dim);background:var(--bg2)">
+      <span style="font-size:11px;letter-spacing:2px;color:var(--g)">// CREATE ROOM</span>
+      <button onclick="hideModals()" style="all:unset;cursor:pointer;color:var(--mid);font-size:14px" onmouseover="this.style.color='var(--g)'" onmouseout="this.style.color='var(--mid)'">[X]</button>
     </div>
-    <div class="space-y-4">
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
       <div>
-        <label class="block text-xs mono text-gray-500 mb-1">ROOM NAME</label>
-        <input id="c-name" type="text" placeholder="secret-ops" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+        <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">ROOM_NAME:</label>
+        <input id="c-name" type="text" placeholder="secret-ops" class="inp">
       </div>
       <div>
-        <label class="block text-xs mono text-gray-500 mb-1">PASSPHRASE</label>
-        <input id="c-pass" type="password" placeholder="strong-passphrase" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+        <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">PASSPHRASE:</label>
+        <input id="c-pass" type="password" placeholder="••••••••" class="inp">
       </div>
       <div>
-        <label class="block text-xs mono text-gray-500 mb-1">YOUR NICK</label>
-        <input id="c-nick" type="text" placeholder="ghost" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+        <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">NICK:</label>
+        <input id="c-nick" type="text" placeholder="ghost" class="inp">
       </div>
       <div>
-        <label class="block text-xs mono text-gray-500 mb-1">SELF-DESTRUCT</label>
-        <select id="c-ttl" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
-          <option value="1">1 hour</option>
-          <option value="3">3 hours</option>
-          <option value="6">6 hours</option>
-          <option value="12" selected>12 hours</option>
-          <option value="24">24 hours</option>
+        <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">SELF_DESTRUCT:</label>
+        <select id="c-ttl" class="inp">
+          <option value="1">01:00:00</option>
+          <option value="3">03:00:00</option>
+          <option value="6">06:00:00</option>
+          <option value="12" selected>12:00:00</option>
+          <option value="24">24:00:00</option>
         </select>
       </div>
-      <button onclick="doCreate()" id="create-btn" class="w-full py-2.5 rounded-lg bg-ghost-400/20 text-ghost-400 font-semibold hover:bg-ghost-400/30 transition mono text-sm">
-        CREATE ROOM
-      </button>
-      <div id="create-status" class="text-xs mono text-center"></div>
+      <button onclick="doCreate()" id="create-btn" class="btn" style="width:100%">INITIALIZE</button>
+      <div id="create-status" style="font-size:10px;text-align:center;min-height:14px"></div>
     </div>
   </div>
 </div>
 
-<!-- ========== JOIN ROOM MODAL ========== -->
-<div id="join-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center px-4 hidden z-50">
-  <div class="bg-dark-800 border border-ghost-400/20 rounded-xl p-6 w-full max-w-md fade-in glow-border">
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-white font-semibold">Join Room</h2>
-      <button onclick="hideModals()" class="text-gray-500 hover:text-white text-xl">&times;</button>
+<!-- ==================== JOIN MODAL ==================== -->
+<div id="join-modal" class="full hidden" style="background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50">
+  <div class="fade-in" style="background:var(--bg);border:1px solid var(--g);max-width:440px;width:100%;box-shadow:0 0 30px rgba(0,255,65,0.1)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--dim);background:var(--bg2)">
+      <span style="font-size:11px;letter-spacing:2px;color:var(--g)">// JOIN ROOM</span>
+      <button onclick="hideModals()" style="all:unset;cursor:pointer;color:var(--mid);font-size:14px" onmouseover="this.style.color='var(--g)'" onmouseout="this.style.color='var(--mid)'">[X]</button>
     </div>
-    <div class="space-y-4">
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
       <div>
-        <label class="block text-xs mono text-gray-500 mb-1">ROOM ID</label>
-        <input id="j-room" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+        <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">ROOM_ID:</label>
+        <input id="j-room" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="inp">
       </div>
       <div>
-        <label class="block text-xs mono text-gray-500 mb-1">PASSPHRASE</label>
-        <input id="j-pass" type="password" placeholder="passphrase" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+        <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">PASSPHRASE:</label>
+        <input id="j-pass" type="password" placeholder="••••••••" class="inp">
       </div>
       <div>
-        <label class="block text-xs mono text-gray-500 mb-1">YOUR NICK</label>
-        <input id="j-nick" type="text" placeholder="ghost" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+        <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">NICK:</label>
+        <input id="j-nick" type="text" placeholder="ghost" class="inp">
       </div>
-      <button onclick="doJoin()" id="join-btn" class="w-full py-2.5 rounded-lg bg-ghost-400/20 text-ghost-400 font-semibold hover:bg-ghost-400/30 transition mono text-sm">
-        JOIN ROOM
-      </button>
-      <div id="join-status" class="text-xs mono text-center"></div>
+      <button onclick="doJoin()" id="join-btn" class="btn" style="width:100%">CONNECT</button>
+      <div id="join-status" style="font-size:10px;text-align:center;min-height:14px"></div>
     </div>
   </div>
 </div>
 
-<!-- ========== CHAT VIEW ========== -->
-<div id="chat-view" class="fixed inset-0 flex flex-col hidden">
-  <!-- Scan line overlay -->
-  <div class="scan-line fixed inset-0 z-10"></div>
+<!-- ==================== CHAT VIEW ==================== -->
+<div id="chat-view" class="full hidden" style="display:flex;flex-direction:column;background:var(--bg)">
 
-  <!-- Chat header -->
-  <div class="relative z-20 flex items-center justify-between px-4 py-3 border-b border-ghost-400/10 bg-dark-950/95 backdrop-blur">
-    <div class="flex items-center gap-3">
-      <div class="w-2 h-2 rounded-full bg-ghost-400 pulse-dot"></div>
-      <div>
-        <span id="room-name" class="text-white font-semibold text-sm"></span>
-        <span id="room-ttl" class="text-xs mono text-gray-500 ml-2"></span>
-      </div>
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--dim);background:var(--bg2);z-index:20">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="pulse" style="display:inline-block;width:6px;height:6px;background:var(--g);border-radius:50%"></span>
+      <span id="room-name" class="glow-sm" style="font-size:13px;color:var(--g)"></span>
+      <span style="color:var(--dim)">|</span>
+      <span id="room-ttl" style="font-size:10px;color:var(--mid)"></span>
     </div>
-    <div class="flex items-center gap-3">
-      <button onclick="copyInvite()" class="text-xs mono px-3 py-1.5 rounded border border-ghost-400/20 text-ghost-400/70 hover:text-ghost-400 hover:border-ghost-400/40 transition" title="Copy invite link">
-        INVITE
-      </button>
-      <button onclick="leaveRoom()" class="text-xs mono px-3 py-1.5 rounded border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/40 transition">
-        LEAVE
-      </button>
+    <div style="display:flex;gap:8px">
+      <button onclick="copyInvite()" class="btn btn-sm">INVITE</button>
+      <button onclick="leaveRoom()" class="btn btn-sm btn-danger">LEAVE</button>
     </div>
   </div>
 
   <!-- Messages -->
-  <div id="messages" class="relative z-20 flex-1 overflow-y-auto px-4 py-4 space-y-1 mono text-sm">
-    <!-- Messages render here -->
-  </div>
+  <div id="messages" style="flex:1;overflow-y:auto;padding:12px 16px;font-size:12px;line-height:1.7;z-index:20"></div>
 
-  <!-- Input bar -->
-  <div class="relative z-20 px-4 py-3 border-t border-ghost-400/10 bg-dark-950/95 backdrop-blur">
-    <div class="flex items-center gap-2">
-      <span id="nick-label" class="text-ghost-400/60 mono text-sm"></span>
-      <input id="msg-input" type="text" placeholder="type a message..." class="flex-1 bg-transparent text-white mono text-sm focus:outline-none" onkeydown="if(event.key==='Enter')doSend()">
-      <button onclick="doSend()" id="send-btn" class="px-4 py-1.5 rounded bg-ghost-400/20 text-ghost-400 mono text-xs hover:bg-ghost-400/30 transition">
-        SEND
-      </button>
+  <!-- Input -->
+  <div style="padding:10px 16px;border-top:1px solid var(--dim);background:var(--bg2);z-index:20">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="nick-label" style="color:var(--gd);font-size:12px;white-space:nowrap"></span>
+      <input id="msg-input" type="text" placeholder="..." class="inp" style="border:none;padding:8px 0;background:transparent" onkeydown="if(event.key==='Enter')doSend()">
+      <button onclick="doSend()" id="send-btn" class="btn btn-sm" style="white-space:nowrap">SEND</button>
     </div>
-    <div id="send-status" class="text-xs mono mt-1 text-gray-600"></div>
+    <div id="send-status" style="font-size:9px;color:var(--mid);min-height:12px;margin-top:4px"></div>
   </div>
 </div>
 
+<!-- ==================== ABOUT PAGE (accessible via ? button) ==================== -->
+<div id="about-modal" class="full hidden" style="background:rgba(0,0,0,.95);overflow-y:auto;z-index:60;padding:40px 24px">
+  <div style="max-width:640px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:32px">
+      <pre class="glow" style="font-size:9px;line-height:1.2;color:var(--g)">
+ ██████╗ ██╗  ██╗ ██████╗ ███████╗████████╗
+██╔════╝ ██║  ██║██╔═══██╗██╔════╝╚══██╔══╝
+██║  ███╗███████║██║   ██║███████╗   ██║
+██║   ██║██╔══██║██║   ██║╚════██║   ██║
+╚██████╔╝██║  ██║╚██████╔╝███████║   ██║
+ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝</pre>
+      <button onclick="document.getElementById('about-modal').classList.add('hidden')" style="all:unset;cursor:pointer;color:var(--mid);font-size:14px" onmouseover="this.style.color='var(--g)'" onmouseout="this.style.color='var(--mid)'">[X]</button>
+    </div>
+
+    <div style="font-size:11px;line-height:1.8;color:var(--txt)">
+      <p style="color:var(--g);font-size:13px;margin-bottom:16px;letter-spacing:2px">// ABOUT</p>
+
+      <p style="margin-bottom:16px">
+        GhostNet is an ephemeral encrypted chat system built on
+        <a href="https://arkiv.network" target="_blank">Arkiv L3</a>.
+        Messages are AES-256-GCM encrypted client-side and stored
+        on-chain with built-in TTL. When time expires, everything
+        is automatically purged. No servers. No databases. No logs.
+      </p>
+
+      <p style="color:var(--g);font-size:13px;margin-bottom:16px;margin-top:32px;letter-spacing:2px">// SECURITY MODEL</p>
+
+      <pre style="color:var(--mid);font-size:10px;line-height:1.5;margin-bottom:16px">
+┌──────────────────────────────────────────────────┐
+│  passphrase + roomId                             │
+│       │                                          │
+│       ▼                                          │
+│  PBKDF2 (100k iterations, SHA-256)               │
+│       │                                          │
+│       ▼                                          │
+│  AES-256-GCM key                                 │
+│       │                                          │
+│       ├──▶ encrypt(msg, random IV) ──▶ on-chain  │
+│       └──▶ decrypt(ciphertext) ──▶ plaintext     │
+│                                                  │
+│  Keys NEVER leave your browser.                  │
+│  Wrong passphrase = zero messages visible.       │
+└──────────────────────────────────────────────────┘</pre>
+
+      <p style="color:var(--g);font-size:13px;margin-bottom:16px;margin-top:32px;letter-spacing:2px">// USE CASES</p>
+
+      <div style="display:grid;gap:8px;margin-bottom:16px">
+        <div style="padding:12px;border:1px solid var(--dim)">
+          <span style="color:var(--gd)">01</span> <span style="color:var(--white)">SECURE TEAM SYNC</span><br>
+          <span style="color:var(--mid);font-size:10px">Create room before sensitive meeting. Share passphrase verbally. Auto-destruct after.</span>
+        </div>
+        <div style="padding:12px;border:1px solid var(--dim)">
+          <span style="color:var(--gd)">02</span> <span style="color:var(--white)">WHISTLEBLOWER DROPS</span><br>
+          <span style="color:var(--mid);font-size:10px">Journalist creates room. Source sends info via invite link. No server logs.</span>
+        </div>
+        <div style="padding:12px;border:1px solid var(--dim)">
+          <span style="color:var(--gd)">03</span> <span style="color:var(--white)">INCIDENT RESPONSE</span><br>
+          <span style="color:var(--mid);font-size:10px">Quick encrypted channel for dev coordination. No Slack history.</span>
+        </div>
+        <div style="padding:12px;border:1px solid var(--dim)">
+          <span style="color:var(--gd)">04</span> <span style="color:var(--white)">CTF / HACKATHON</span><br>
+          <span style="color:var(--mid);font-size:10px">Temporary war room for competition teams. Auto-cleanup when done.</span>
+        </div>
+        <div style="padding:12px;border:1px solid var(--dim)">
+          <span style="color:var(--gd)">05</span> <span style="color:var(--white)">AI AGENT COORDINATION</span><br>
+          <span style="color:var(--mid);font-size:10px">Claude Code creates rooms for multi-agent task coordination with built-in expiry.</span>
+        </div>
+      </div>
+
+      <p style="color:var(--g);font-size:13px;margin-bottom:16px;margin-top:32px;letter-spacing:2px">// HOW TO TEST</p>
+
+      <pre style="color:var(--mid);font-size:10px;line-height:1.6;margin-bottom:16px">
+STEP 1: Open this page
+STEP 2: Click "get testnet ETH" below → complete CAPTCHA (~10s)
+STEP 3: Create Room → fill name, passphrase, nick, TTL
+STEP 4: Click INVITE → send link to friend
+STEP 5: Friend opens link → enters nick → joins
+STEP 6: Chat. Messages appear in 2-4 seconds.
+STEP 7: After TTL expires — everything vanishes.</pre>
+
+      <p style="color:var(--g);font-size:13px;margin-bottom:16px;margin-top:32px;letter-spacing:2px">// STACK</p>
+
+      <pre style="color:var(--mid);font-size:10px;line-height:1.6">
+CRYPTO:    AES-256-GCM + PBKDF2 (Web Crypto API)
+STORAGE:   Arkiv L3 (Mendoza Testnet)
+TRANSPORT: On-chain entities with TTL
+FRONTEND:  Single HTML file, zero build step
+BACKEND:   None. Zero. Nada.</pre>
+
+      <p style="text-align:center;margin-top:40px;font-size:10px;color:var(--dim)">
+        <a href="https://github.com/exhuman777/ghostnet" target="_blank" style="color:var(--gd)">github.com/exhuman777/ghostnet</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- About button (fixed) -->
+<button onclick="document.getElementById('about-modal').classList.toggle('hidden')" style="all:unset;cursor:pointer;position:fixed;bottom:16px;right:16px;width:28px;height:28px;border:1px solid var(--dim);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--mid);z-index:40;background:var(--bg)" onmouseover="this.style.borderColor='var(--g)';this.style.color='var(--g)'" onmouseout="this.style.borderColor='var(--dim)';this.style.color='var(--mid)'">?</button>
+
 <script type="module">
-// ========== ARKIV SDK (ESM CDN) ==========
+// ========== ARKIV SDK ==========
 import { createPublicClient, createWalletClient, http, jsonToPayload } from 'https://esm.sh/@arkiv-network/sdk@0.5.3';
 import { mendoza } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/chains';
 import { privateKeyToAccount, generatePrivateKey } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/accounts';
 import { eq, and } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/query';
 import { ExpirationTime } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/utils';
 
-// ========== CONSTANTS ==========
-const GHOSTNET_TYPE = 'ghostnet';
-const KIND_ROOM = 'room';
-const KIND_MSG = 'msg';
-const ATTR = { TYPE: 'type', KIND: 'kind', ROOM_ID: 'roomId', NICK: 'nick', TS: 'ts' };
+// ========== CONST ==========
+const T = 'ghostnet', KR = 'room', KM = 'msg';
+const A = { T:'type', K:'kind', R:'roomId', N:'nick', S:'ts' };
 
 // ========== STATE ==========
-let wallet = null;
-let publicClient = null;
-let walletClient = null;
-let currentRoom = null;  // { roomId, passphrase, nick, name, ttlHours, createdAt }
-let seenKeys = new Set();
-let pollTimer = null;
+let wallet, pub, wc, room, seen = new Set(), timer;
 
-// ========== CRYPTO (browser Web Crypto API) ==========
-async function deriveKey(passphrase, roomId) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+// ========== CRYPTO ==========
+async function dk(pass, rid) {
+  const e = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', e.encode(pass), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: enc.encode(roomId), iterations: 100000, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false, ['encrypt', 'decrypt']
+    { name:'PBKDF2', salt:e.encode(rid), iterations:100000, hash:'SHA-256' },
+    km, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
   );
 }
-
-async function encryptMsg(text, key) {
-  const enc = new TextEncoder();
+async function enc(txt, k) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
-  return { iv: b64encode(iv), ct: b64encode(new Uint8Array(ct)) };
+  const ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, k, new TextEncoder().encode(txt));
+  return { iv:b64e(iv), ct:b64e(new Uint8Array(ct)) };
 }
-
-async function decryptMsg(payload, key) {
-  const iv = b64decode(payload.iv);
-  const ct = b64decode(payload.ct);
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
-  return new TextDecoder().decode(plain);
+async function dec(p, k) {
+  const buf = await crypto.subtle.decrypt({ name:'AES-GCM', iv:b64d(p.iv) }, k, b64d(p.ct));
+  return new TextDecoder().decode(buf);
 }
-
-function b64encode(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
-function b64decode(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+function b64e(b) { return btoa(String.fromCharCode(...new Uint8Array(b))); }
+function b64d(s) { return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
 
 // ========== WALLET ==========
 function initWallet() {
   let pk = localStorage.getItem('ghostnet_pk');
-  if (!pk) {
-    pk = generatePrivateKey();
-    localStorage.setItem('ghostnet_pk', pk);
-  }
-  const account = privateKeyToAccount(pk);
-  wallet = { privateKey: pk, address: account.address };
-  publicClient = createPublicClient({ chain: mendoza, transport: http() });
-  walletClient = createWalletClient({ chain: mendoza, transport: http(), account });
-
-  const statusEl = document.getElementById('wallet-status');
-  statusEl.innerHTML = `wallet: <span class="text-ghost-400/50">${wallet.address.slice(0,6)}...${wallet.address.slice(-4)}</span> — <a href="https://mendoza.hoodi.arkiv.network/faucet/" target="_blank" class="text-ghost-400/70 underline hover:text-ghost-400">get testnet ETH</a>`;
+  if (!pk) { pk = generatePrivateKey(); localStorage.setItem('ghostnet_pk', pk); }
+  const acc = privateKeyToAccount(pk);
+  wallet = { pk, addr: acc.address };
+  pub = createPublicClient({ chain:mendoza, transport:http() });
+  wc = createWalletClient({ chain:mendoza, transport:http(), account:acc });
+  const el = document.getElementById('wallet-status');
+  el.innerHTML = `<span style="color:var(--dim)">WALLET:</span> <span style="color:var(--gd)">${wallet.addr.slice(0,6)}...${wallet.addr.slice(-4)}</span> <span style="color:var(--dim)">—</span> <a href="https://mendoza.hoodi.arkiv.network/faucet/" target="_blank" style="color:var(--g)">GET TESTNET ETH</a>`;
 }
 
 // ========== HELPERS ==========
-function decodePayload(payload) {
-  if (!payload) return {};
-  return JSON.parse(new TextDecoder().decode(payload));
+function dp(p) { return p ? JSON.parse(new TextDecoder().decode(p)) : {}; }
+function am(a) { const m={}; for(const x of a) m[x.key]=String(x.value); return m; }
+function tf(ts) { return new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function ttl(ca, h) {
+  const left = ca + h*3600000 - Date.now();
+  if (left<=0) return 'EXPIRED';
+  const hh=Math.floor(left/3600000), mm=Math.floor((left%3600000)/60000), ss=Math.floor((left%60000)/1000);
+  return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
 }
-
-function attrsToMap(attrs) {
-  const m = {};
-  for (const a of attrs) m[a.key] = String(a.value);
-  return m;
-}
-
-function timeAgo(ts) {
-  const d = new Date(ts * 1000);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
-function ttlCountdown(createdAt, ttlHours) {
-  const end = createdAt + ttlHours * 3600 * 1000;
-  const left = end - Date.now();
-  if (left <= 0) return 'expired';
-  const h = Math.floor(left / 3600000);
-  const m = Math.floor((left % 3600000) / 60000);
-  return `${h}h ${m}m left`;
-}
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
 // ========== MODALS ==========
 window.showCreate = () => { hideModals(); document.getElementById('create-modal').classList.remove('hidden'); };
 window.showJoin = () => { hideModals(); document.getElementById('join-modal').classList.remove('hidden'); };
-window.hideModals = () => {
-  document.getElementById('create-modal').classList.add('hidden');
-  document.getElementById('join-modal').classList.add('hidden');
-};
+window.hideModals = () => { document.getElementById('create-modal').classList.add('hidden'); document.getElementById('join-modal').classList.add('hidden'); };
 
-// ========== CREATE ROOM ==========
+// ========== CREATE ==========
 window.doCreate = async () => {
-  const name = document.getElementById('c-name').value.trim() || 'unnamed';
+  const name = document.getElementById('c-name').value.trim()||'unnamed';
   const pass = document.getElementById('c-pass').value;
-  const nick = document.getElementById('c-nick').value.trim() || 'ghost';
-  const ttl = parseInt(document.getElementById('c-ttl').value);
-  const statusEl = document.getElementById('create-status');
-
-  if (!pass) { statusEl.textContent = 'passphrase required'; statusEl.className = 'text-xs mono text-center text-red-400'; return; }
-
+  const nick = document.getElementById('c-nick').value.trim()||'ghost';
+  const ttlH = parseInt(document.getElementById('c-ttl').value);
+  const st = document.getElementById('create-status');
+  if (!pass) { st.textContent='> ERROR: passphrase required'; st.style.color='#ff4444'; return; }
   const btn = document.getElementById('create-btn');
-  btn.disabled = true; btn.textContent = 'CREATING...';
-  statusEl.textContent = 'signing transaction...';
-  statusEl.className = 'text-xs mono text-center text-ghost-400/50';
-
+  btn.disabled=true; btn.textContent='INITIALIZING...';
+  st.textContent='> signing transaction...'; st.style.color='var(--gd)';
   try {
-    const roomId = crypto.randomUUID();
-    const meta = { name, createdBy: nick, ttlHours: ttl, createdAt: Date.now() };
-    await walletClient.createEntity({
-      payload: jsonToPayload(meta),
-      attributes: [
-        { key: ATTR.TYPE, value: GHOSTNET_TYPE },
-        { key: ATTR.KIND, value: KIND_ROOM },
-        { key: ATTR.ROOM_ID, value: roomId },
-        { key: ATTR.NICK, value: nick },
-        { key: ATTR.TS, value: String(Math.floor(Date.now() / 1000)) },
+    const rid = crypto.randomUUID();
+    const meta = { name, createdBy:nick, ttlHours:ttlH, createdAt:Date.now() };
+    await wc.createEntity({
+      payload:jsonToPayload(meta),
+      attributes:[
+        {key:A.T,value:T},{key:A.K,value:KR},{key:A.R,value:rid},
+        {key:A.N,value:nick},{key:A.S,value:String(Math.floor(Date.now()/1000))}
       ],
-      contentType: 'application/json',
-      expiresIn: ExpirationTime.fromHours(ttl),
+      contentType:'application/json',
+      expiresIn:ExpirationTime.fromHours(ttlH),
     });
-
-    currentRoom = { roomId, passphrase: pass, nick, name, ttlHours: ttl, createdAt: Date.now() };
+    room = { roomId:rid, passphrase:pass, nick, name, ttlHours:ttlH, createdAt:Date.now() };
     enterChat();
-  } catch (e) {
-    statusEl.textContent = e.message?.includes('insufficient') ? 'Need testnet ETH — use faucet link below' : 'Error: ' + (e.shortMessage || e.message);
-    statusEl.className = 'text-xs mono text-center text-red-400';
-    btn.disabled = false; btn.textContent = 'CREATE ROOM';
+  } catch(e) {
+    st.textContent = e.message?.includes('insufficient') ? '> ERROR: need testnet ETH — use faucet' : '> ERROR: '+(e.shortMessage||e.message);
+    st.style.color='#ff4444'; btn.disabled=false; btn.textContent='INITIALIZE';
   }
 };
 
-// ========== JOIN ROOM ==========
+// ========== JOIN ==========
 window.doJoin = async () => {
-  const roomId = document.getElementById('j-room').value.trim();
+  const rid = document.getElementById('j-room').value.trim();
   const pass = document.getElementById('j-pass').value;
-  const nick = document.getElementById('j-nick').value.trim() || 'ghost';
-  const statusEl = document.getElementById('join-status');
-
-  if (!roomId || !pass) { statusEl.textContent = 'room ID and passphrase required'; statusEl.className = 'text-xs mono text-center text-red-400'; return; }
-
+  const nick = document.getElementById('j-nick').value.trim()||'ghost';
+  const st = document.getElementById('join-status');
+  if (!rid||!pass) { st.textContent='> ERROR: room ID + passphrase required'; st.style.color='#ff4444'; return; }
   const btn = document.getElementById('join-btn');
-  btn.disabled = true; btn.textContent = 'JOINING...';
-  statusEl.textContent = 'looking up room...';
-  statusEl.className = 'text-xs mono text-center text-ghost-400/50';
-
+  btn.disabled=true; btn.textContent='CONNECTING...';
+  st.textContent='> querying room...'; st.style.color='var(--gd)';
   try {
-    const result = await publicClient.buildQuery()
-      .where(and([eq(ATTR.TYPE, GHOSTNET_TYPE), eq(ATTR.KIND, KIND_ROOM), eq(ATTR.ROOM_ID, roomId)]))
+    const r = await pub.buildQuery()
+      .where(and([eq(A.T,T),eq(A.K,KR),eq(A.R,rid)]))
       .withAttributes().withPayload().limit(1).fetch();
-
-    if (!result.entities.length) {
-      statusEl.textContent = 'room not found or expired';
-      statusEl.className = 'text-xs mono text-center text-red-400';
-      btn.disabled = false; btn.textContent = 'JOIN ROOM';
-      return;
+    if (!r.entities.length) {
+      st.textContent='> ERROR: room not found or expired'; st.style.color='#ff4444';
+      btn.disabled=false; btn.textContent='CONNECT'; return;
     }
-
-    const room = decodePayload(result.entities[0].payload);
-    currentRoom = { roomId, passphrase: pass, nick, name: room.name, ttlHours: room.ttlHours, createdAt: room.createdAt };
+    const meta = dp(r.entities[0].payload);
+    room = { roomId:rid, passphrase:pass, nick, name:meta.name, ttlHours:meta.ttlHours, createdAt:meta.createdAt };
     enterChat();
-  } catch (e) {
-    statusEl.textContent = 'Error: ' + (e.shortMessage || e.message);
-    statusEl.className = 'text-xs mono text-center text-red-400';
-    btn.disabled = false; btn.textContent = 'JOIN ROOM';
+  } catch(e) {
+    st.textContent='> ERROR: '+(e.shortMessage||e.message); st.style.color='#ff4444';
+    btn.disabled=false; btn.textContent='CONNECT';
   }
 };
 
 // ========== CHAT ==========
 function enterChat() {
   hideModals();
-  document.getElementById('landing').classList.add('hidden');
-  document.getElementById('chat-view').classList.remove('hidden');
-  document.getElementById('room-name').textContent = currentRoom.name;
-  document.getElementById('nick-label').textContent = currentRoom.nick + ' >';
+  document.getElementById('landing').style.display='none';
+  const cv = document.getElementById('chat-view');
+  cv.classList.remove('hidden'); cv.style.display='flex';
+  document.getElementById('room-name').textContent = room.name;
+  document.getElementById('nick-label').textContent = room.nick + ' $';
   document.getElementById('msg-input').focus();
-  seenKeys.clear();
+  seen.clear();
   document.getElementById('messages').innerHTML = '';
-  addSystemMsg(`Joined room "${currentRoom.name}" as ${currentRoom.nick}`);
-  addSystemMsg(`Room self-destructs in ${currentRoom.ttlHours}h — all messages encrypted with AES-256-GCM`);
-  updateTTL();
-  pollMessages();
-  pollTimer = setInterval(pollMessages, 2000);
-  setInterval(updateTTL, 30000);
+  sysMsg(`CONNECTED TO "${room.name.toUpperCase()}" AS ${room.nick}`);
+  sysMsg(`SELF-DESTRUCT: ${room.ttlHours}h // CIPHER: AES-256-GCM // POLL: 2s`);
+  sysMsg('─'.repeat(60));
+  updTTL();
+  poll();
+  timer = setInterval(poll, 2000);
+  setInterval(updTTL, 1000);
 }
 
-function updateTTL() {
-  document.getElementById('room-ttl').textContent = ttlCountdown(currentRoom.createdAt, currentRoom.ttlHours);
+function updTTL() {
+  if (!room) return;
+  document.getElementById('room-ttl').textContent = 'TTL ' + ttl(room.createdAt, room.ttlHours);
 }
 
-function addSystemMsg(text) {
+function sysMsg(t) {
   const el = document.createElement('div');
-  el.className = 'text-ghost-400/40 text-xs py-1 fade-in';
-  el.textContent = `> ${text}`;
+  el.className = 'fade-in';
+  el.style.cssText = 'color:var(--mid);font-size:10px;padding:1px 0';
+  el.textContent = '> ' + t;
   document.getElementById('messages').appendChild(el);
-  scrollToBottom();
+  scr();
 }
 
-function addMessage(nick, text, ts, isOwn = false) {
+function addMsg(nick, text, ts, own=false) {
   const el = document.createElement('div');
-  el.className = `py-0.5 fade-in ${isOwn ? 'text-ghost-400/80' : 'text-gray-400'}`;
-  const time = timeAgo(ts);
-  el.innerHTML = `<span class="text-gray-600">[${time}]</span> <span class="${isOwn ? 'text-ghost-400' : 'text-blue-400/80'}">${escHtml(nick)}</span>: ${escHtml(text)}`;
+  el.className = 'fade-in';
+  el.style.cssText = `font-size:12px;padding:2px 0;color:${own?'var(--g)':'var(--txt)'}`;
+  el.innerHTML = `<span style="color:var(--dim)">[${tf(ts)}]</span> <span style="color:${own?'var(--gd)':'#6688cc'}">${esc(nick)}</span> <span style="color:var(--dim)">></span> ${esc(text)}`;
   document.getElementById('messages').appendChild(el);
-  scrollToBottom();
+  scr();
 }
 
-function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function scr() { const m=document.getElementById('messages'); m.scrollTop=m.scrollHeight; }
 
-function scrollToBottom() {
-  const m = document.getElementById('messages');
-  m.scrollTop = m.scrollHeight;
-}
-
-async function pollMessages() {
-  if (!currentRoom) return;
+async function poll() {
+  if (!room) return;
   try {
-    const result = await publicClient.buildQuery()
-      .where(and([eq(ATTR.TYPE, GHOSTNET_TYPE), eq(ATTR.KIND, KIND_MSG), eq(ATTR.ROOM_ID, currentRoom.roomId)]))
+    const r = await pub.buildQuery()
+      .where(and([eq(A.T,T),eq(A.K,KM),eq(A.R,room.roomId)]))
       .withAttributes().withPayload().limit(200).fetch();
-
-    const key = await deriveKey(currentRoom.passphrase, currentRoom.roomId);
-    const newMsgs = [];
-
-    for (const e of result.entities) {
-      if (seenKeys.has(e.key)) continue;
-      seenKeys.add(e.key);
-      const attrs = attrsToMap(e.attributes);
-      const payload = decodePayload(e.payload);
-      try {
-        const text = await decryptMsg(payload, key);
-        newMsgs.push({ nick: attrs[ATTR.NICK], text, ts: Number(attrs[ATTR.TS]) });
-      } catch { /* wrong key — skip */ }
+    const k = await dk(room.passphrase, room.roomId);
+    const nm = [];
+    for (const e of r.entities) {
+      if (seen.has(e.key)) continue;
+      seen.add(e.key);
+      const a=am(e.attributes), p=dp(e.payload);
+      try { nm.push({ nick:a[A.N], text:await dec(p,k), ts:Number(a[A.S]) }); } catch{}
     }
-
-    newMsgs.sort((a, b) => a.ts - b.ts);
-    for (const m of newMsgs) {
-      addMessage(m.nick, m.text, m.ts, m.nick === currentRoom.nick);
-    }
-  } catch (e) {
-    console.error('poll error:', e);
-  }
+    nm.sort((a,b)=>a.ts-b.ts);
+    for (const m of nm) addMsg(m.nick, m.text, m.ts, m.nick===room.nick);
+  } catch(e) { console.error('poll:',e); }
 }
 
-// ========== SEND MESSAGE ==========
+// ========== SEND ==========
 window.doSend = async () => {
-  const input = document.getElementById('msg-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-
-  const ts = Math.floor(Date.now() / 1000);
-  // optimistic display
-  addMessage(currentRoom.nick, text, ts, true);
-
-  const statusEl = document.getElementById('send-status');
+  const inp = document.getElementById('msg-input');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  inp.value = '';
+  const ts = Math.floor(Date.now()/1000);
+  addMsg(room.nick, txt, ts, true);
+  const st = document.getElementById('send-status');
   try {
-    const key = await deriveKey(currentRoom.passphrase, currentRoom.roomId);
-    const encrypted = await encryptMsg(text, key);
-    const result = await walletClient.createEntity({
-      payload: jsonToPayload(encrypted),
-      attributes: [
-        { key: ATTR.TYPE, value: GHOSTNET_TYPE },
-        { key: ATTR.KIND, value: KIND_MSG },
-        { key: ATTR.ROOM_ID, value: currentRoom.roomId },
-        { key: ATTR.NICK, value: currentRoom.nick },
-        { key: ATTR.TS, value: String(ts) },
+    const k = await dk(room.passphrase, room.roomId);
+    const e = await enc(txt, k);
+    const r = await wc.createEntity({
+      payload:jsonToPayload(e),
+      attributes:[
+        {key:A.T,value:T},{key:A.K,value:KM},{key:A.R,value:room.roomId},
+        {key:A.N,value:room.nick},{key:A.S,value:String(ts)}
       ],
-      contentType: 'application/json',
-      expiresIn: ExpirationTime.fromHours(currentRoom.ttlHours),
+      contentType:'application/json',
+      expiresIn:ExpirationTime.fromHours(room.ttlHours),
     });
-    // mark as seen so poll doesn't re-add
-    seenKeys.add(result.entityKey);
-    statusEl.textContent = '';
-  } catch (e) {
-    statusEl.textContent = e.message?.includes('insufficient') ? 'need testnet ETH' : 'send failed';
-    statusEl.className = 'text-xs mono mt-1 text-red-400';
-    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    seen.add(r.entityKey);
+    st.textContent='';
+  } catch(e) {
+    st.textContent = e.message?.includes('insufficient') ? '> need testnet ETH' : '> send failed';
+    st.style.color='#ff4444';
+    setTimeout(()=>{st.textContent='';},3000);
   }
 };
 
 // ========== INVITE ==========
 window.copyInvite = () => {
-  const url = `${location.origin}${location.pathname}#roomId=${currentRoom.roomId}&pass=${encodeURIComponent(currentRoom.passphrase)}`;
-  navigator.clipboard.writeText(url).then(() => {
-    addSystemMsg('Invite link copied to clipboard');
-  }).catch(() => {
-    addSystemMsg('Copy this invite: ' + url);
-  });
+  const url = `${location.origin}${location.pathname}#roomId=${room.roomId}&pass=${encodeURIComponent(room.passphrase)}`;
+  navigator.clipboard.writeText(url).then(()=>sysMsg('INVITE LINK COPIED')).catch(()=>sysMsg('INVITE: '+url));
 };
 
 // ========== LEAVE ==========
 window.leaveRoom = () => {
-  if (pollTimer) clearInterval(pollTimer);
-  currentRoom = null;
-  seenKeys.clear();
+  if (timer) clearInterval(timer);
+  room=null; seen.clear();
   document.getElementById('chat-view').classList.add('hidden');
-  document.getElementById('landing').classList.remove('hidden');
-  // reset modals
-  document.getElementById('create-btn').disabled = false;
-  document.getElementById('create-btn').textContent = 'CREATE ROOM';
-  document.getElementById('join-btn').disabled = false;
-  document.getElementById('join-btn').textContent = 'JOIN ROOM';
-  document.getElementById('create-status').textContent = '';
-  document.getElementById('join-status').textContent = '';
+  document.getElementById('chat-view').style.display='none';
+  document.getElementById('landing').style.display='flex';
+  document.getElementById('create-btn').disabled=false;
+  document.getElementById('create-btn').textContent='INITIALIZE';
+  document.getElementById('join-btn').disabled=false;
+  document.getElementById('join-btn').textContent='CONNECT';
+  document.getElementById('create-status').textContent='';
+  document.getElementById('join-status').textContent='';
 };
 
-// ========== AUTO-JOIN FROM URL HASH ==========
+// ========== AUTO-JOIN ==========
 function checkHash() {
-  const hash = location.hash.slice(1);
-  if (!hash) return;
-  const params = new URLSearchParams(hash);
-  const roomId = params.get('roomId');
-  const pass = params.get('pass');
-  if (roomId && pass) {
-    document.getElementById('j-room').value = roomId;
-    document.getElementById('j-pass').value = pass;
+  const h = location.hash.slice(1);
+  if (!h) return;
+  const p = new URLSearchParams(h);
+  const rid=p.get('roomId'), pass=p.get('pass');
+  if (rid&&pass) {
+    document.getElementById('j-room').value=rid;
+    document.getElementById('j-pass').value=pass;
     showJoin();
   }
 }
