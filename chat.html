@@ -537,13 +537,22 @@ window.connectWallet = async () => {
       await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:MENDOZA_CHAIN_ID }] });
     } catch(switchErr) {
       if (switchErr.code === 4902) {
-        await window.ethereum.request({ method:'wallet_addEthereumChain', params:[{
-          chainId: MENDOZA_CHAIN_ID,
-          chainName: 'Arkiv Mendoza Testnet',
-          rpcUrls: ['https://mendoza.hoodi.arkiv.network/rpc'],
-          nativeCurrency: { name:'Ethereum', symbol:'ETH', decimals:18 },
-          blockExplorerUrls: ['https://explorer.mendoza.hoodi.arkiv.network']
-        }] });
+        try {
+          await window.ethereum.request({ method:'wallet_addEthereumChain', params:[{
+            chainId: MENDOZA_CHAIN_ID,
+            chainName: 'Arkiv Mendoza Testnet',
+            rpcUrls: ['https://mendoza.hoodi.arkiv.network/rpc'],
+            nativeCurrency: { name:'Ethereum', symbol:'ETH', decimals:18 },
+            blockExplorerUrls: ['https://explorer.mendoza.hoodi.arkiv.network']
+          }] });
+        } catch(addErr) {
+          // RPC conflict with existing chain — try switch again, may have been added under different name
+          try {
+            await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:MENDOZA_CHAIN_ID }] });
+          } catch(retryErr) {
+            throw new Error('CHAIN CONFLICT: Remove duplicate Arkiv network from MetaMask (Settings > Networks) then retry');
+          }
+        }
       } else throw switchErr;
     }
 
