@@ -16,10 +16,30 @@ function flag(name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+// 3C: validate integer flag within bounds
+function intFlag(name: string, fallback: number, min: number, max: number): number {
+  const raw = flag(name);
+  if (raw === undefined) return fallback;
+  const n = parseInt(raw, 10);
+  if (isNaN(n)) { console.error(`Invalid --${name}: must be a number`); process.exit(1); }
+  if (n < min || n > max) { console.error(`Invalid --${name}: must be ${min}-${max}`); process.exit(1); }
+  return n;
+}
+
 function getKey(): `0x${string}` {
   const k = flag('key') ?? process.env.GHOSTNET_PRIVATE_KEY;
   if (!k) { console.error('Need --key or GHOSTNET_PRIVATE_KEY'); process.exit(1); }
+  // 3C: validate key format
+  if (!k.startsWith('0x') || !/^0x[0-9a-fA-F]{64}$/.test(k)) {
+    console.error('Invalid key: must be 0x + 64 hex chars');
+    process.exit(1);
+  }
   return k as `0x${string}`;
+}
+
+// 3A: redact key for display
+function redactKey(k: string): string {
+  return k.slice(0, 6) + '...' + k.slice(-4);
 }
 
 async function main() {
@@ -27,7 +47,7 @@ async function main() {
     case 'create': {
       const gn = new GhostNet(getKey());
       const name = flag('name') ?? 'unnamed';
-      const ttl = Number(flag('ttl') ?? 1);
+      const ttl = intFlag('ttl', 1, 1, 720);
       const nick = flag('nick') ?? 'anon';
       const pass = flag('pass');
       if (!pass) { console.error('Need --pass'); process.exit(1); }
@@ -37,7 +57,9 @@ async function main() {
       console.log(`  entity: ${entityKey}`);
       console.log(`  tx:     ${txHash}`);
       console.log(`  TTL:    ${ttl}h`);
-      console.log(`\nShare: --room=${roomId} --pass=${pass}`);
+      // 3B: no passphrase in share line
+      console.log(`\nShare: --room=${roomId}`);
+      console.log(`(share passphrase separately via secure channel)`);
       break;
     }
 
@@ -62,13 +84,14 @@ async function main() {
     case 'read': {
       const roomId = flag('room');
       const pass = flag('pass');
+      const limit = intFlag('limit', 100, 1, 100);
       if (!roomId || !pass) { console.error('Need --room, --pass'); process.exit(1); }
 
       const room = await queryRoom(roomId);
       if (!room) { console.error('Room not found'); process.exit(1); }
 
       console.log(`Room: ${room.name} (TTL: ${room.ttlHours}h, by ${room.createdBy})`);
-      const msgs = await queryMessages(roomId, pass);
+      const msgs = await queryMessages(roomId, pass, limit);
       if (!msgs.length) { console.log('No messages (or wrong passphrase).'); break; }
       for (const m of msgs) {
         const t = new Date(m.ts * 1000).toLocaleTimeString();
@@ -78,7 +101,8 @@ async function main() {
     }
 
     case 'rooms': {
-      const rooms = await queryRooms(Number(flag('limit') ?? 20));
+      const limit = intFlag('limit', 20, 1, 100);
+      const rooms = await queryRooms(limit);
       if (!rooms.length) { console.log('No active rooms.'); break; }
       console.table(rooms.map(r => ({
         roomId: r.roomId,
@@ -94,8 +118,10 @@ async function main() {
       const w = generateWallet();
       console.log('Generated wallet:');
       console.log(`  Address:     ${w.address}`);
-      console.log(`  Private key: ${w.privateKey}`);
-      console.log(`\nFund at: https://mendoza.hoodi.arkiv.network/faucet/`);
+      // 3A: redact private key in output
+      console.log(`  Private key: ${redactKey(w.privateKey)}`);
+      console.log(`\nFull key: pipe to file with > ghostnet-wallet.txt`);
+      console.log(`Fund at: https://mendoza.hoodi.arkiv.network/faucet/`);
       console.log(`\nExport: GHOSTNET_PRIVATE_KEY=${w.privateKey}`);
       break;
     }
@@ -110,11 +136,12 @@ async function main() {
       console.log('Usage: ghostnet <create|send|read|rooms|wallet|chat>');
       console.log('  create  --name NAME --ttl HOURS --nick NICK --pass PASSPHRASE');
       console.log('  send    --room ID --pass PASSPHRASE --nick NICK --msg TEXT');
-      console.log('  read    --room ID --pass PASSPHRASE');
+      console.log('  read    --room ID --pass PASSPHRASE [--limit N]');
       console.log('  rooms   [--limit N]');
       console.log('  wallet  Generate new wallet');
       console.log('  chat    Show path to web UI');
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// 3D: sanitize error output
+main().catch((e) => { console.error(e?.message || 'Unknown error'); process.exit(1); });

@@ -78,6 +78,21 @@
   /* Layout helpers */
   .hidden { display:none !important; }
   .full { position:fixed; inset:0; }
+
+  /* Status dot */
+  .status-dot { display:inline-block;width:6px;height:6px;border-radius:50%;transition:background .3s; }
+  .status-dot.green { background:var(--g); animation:pulse 2s infinite; }
+  .status-dot.yellow { background:#ffaa00; animation:pulse 1s infinite; }
+  .status-dot.red { background:#ff4444; }
+
+  /* New messages pill */
+  .new-msg-pill {
+    position:absolute; bottom:70px; left:50%; transform:translateX(-50%);
+    padding:4px 14px; background:var(--bg2); border:1px solid var(--g);
+    color:var(--g); font-size:10px; cursor:pointer; z-index:25; letter-spacing:1px;
+    transition:opacity .2s;
+  }
+  .new-msg-pill:hover { background:var(--g); color:var(--bg); }
 </style>
 </head>
 <body class="scanlines crt">
@@ -120,28 +135,34 @@
         <span style="font-size:10px;padding:4px 10px;border:1px solid var(--dim);color:var(--mid)">ZERO KNOWLEDGE</span>
       </div>
 
+      <!-- Wallet connect -->
+      <div id="wallet-status" style="text-align:center;margin-bottom:32px">
+        <button id="connect-btn" onclick="connectWallet()" class="btn" style="letter-spacing:3px">CONNECT WALLET</button>
+        <div id="wallet-info" class="hidden" style="font-size:10px;color:var(--mid);margin-top:8px"></div>
+        <div id="wallet-error" class="hidden" style="font-size:10px;color:#ff4444;margin-top:8px"></div>
+      </div>
+
       <!-- Action blocks -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
-        <button onclick="showCreate()" style="all:unset;cursor:pointer;display:block;padding:24px;border:1px solid var(--dim);background:var(--bg2);transition:all .15s" onmouseover="this.style.borderColor='var(--g)';this.style.boxShadow='0 0 20px rgba(0,255,65,0.1)'" onmouseout="this.style.borderColor='var(--dim)';this.style.boxShadow='none'">
+        <button id="create-card" onclick="showCreate()" disabled style="all:unset;cursor:pointer;display:block;padding:24px;border:1px solid var(--dim);background:var(--bg2);transition:all .15s;opacity:.3" onmouseover="if(!this.disabled){this.style.borderColor='var(--g)';this.style.boxShadow='0 0 20px rgba(0,255,65,0.1)'}" onmouseout="this.style.borderColor='var(--dim)';this.style.boxShadow='none'">
           <div style="font-size:24px;color:var(--g);margin-bottom:8px">[ + ]</div>
           <div style="font-size:13px;color:var(--white);margin-bottom:4px">CREATE ROOM</div>
           <div style="font-size:10px;color:var(--mid)">Initialize new encrypted channel</div>
         </button>
-        <button onclick="showJoin()" style="all:unset;cursor:pointer;display:block;padding:24px;border:1px solid var(--dim);background:var(--bg2);transition:all .15s" onmouseover="this.style.borderColor='var(--g)';this.style.boxShadow='0 0 20px rgba(0,255,65,0.1)'" onmouseout="this.style.borderColor='var(--dim)';this.style.boxShadow='none'">
+        <button id="join-card" onclick="showJoin()" disabled style="all:unset;cursor:pointer;display:block;padding:24px;border:1px solid var(--dim);background:var(--bg2);transition:all .15s;opacity:.3" onmouseover="if(!this.disabled){this.style.borderColor='var(--g)';this.style.boxShadow='0 0 20px rgba(0,255,65,0.1)'}" onmouseout="this.style.borderColor='var(--dim)';this.style.boxShadow='none'">
           <div style="font-size:24px;color:var(--g);margin-bottom:8px">[ > ]</div>
           <div style="font-size:13px;color:var(--white);margin-bottom:4px">JOIN ROOM</div>
           <div style="font-size:10px;color:var(--mid)">Enter with room ID + passphrase</div>
         </button>
       </div>
-
-      <!-- Wallet -->
-      <div id="wallet-status" style="text-align:center;font-size:10px;color:var(--mid)"></div>
+      <!-- 4C: Hint text -->
+      <div id="wallet-hint" style="text-align:center;font-size:9px;color:var(--mid);margin-top:-24px;margin-bottom:24px;letter-spacing:1px">CONNECT WALLET TO CONTINUE</div>
     </div>
   </div>
 
   <!-- Footer -->
   <div style="padding:16px 24px;border-top:1px solid var(--dim);text-align:center;font-size:9px;color:var(--mid);letter-spacing:1px">
-    MESSAGES ON <a href="https://arkiv.network" target="_blank" style="color:var(--gd)">ARKIV L3</a> // ENCRYPTED AES-256-GCM // KEYS NEVER LEAVE BROWSER
+    <a href="https://arkiv.network" target="_blank" style="color:var(--gd)">ARKIV L3</a> // <a href="https://mendoza.hoodi.arkiv.network/faucet/" target="_blank" style="color:var(--gd)">FAUCET</a> // <a href="https://mendoza.hoodi.arkiv.network/" target="_blank" style="color:var(--gd)">EXPLORER</a> // AES-256-GCM // KEYS NEVER LEAVE BROWSER
   </div>
 </div>
 
@@ -156,15 +177,16 @@
     <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
       <div>
         <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">ROOM_NAME:</label>
-        <input id="c-name" type="text" placeholder="secret-ops" class="inp">
+        <input id="c-name" type="text" placeholder="secret-ops" class="inp" maxlength="64">
       </div>
       <div>
         <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">PASSPHRASE:</label>
         <input id="c-pass" type="password" placeholder="••••••••" class="inp">
+        <div id="c-pass-hint" style="font-size:9px;color:var(--mid);margin-top:2px"></div>
       </div>
       <div>
         <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">NICK:</label>
-        <input id="c-nick" type="text" placeholder="ghost" class="inp">
+        <input id="c-nick" type="text" placeholder="ghost" class="inp" maxlength="32">
       </div>
       <div>
         <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">SELF_DESTRUCT:</label>
@@ -200,7 +222,7 @@
       </div>
       <div>
         <label style="display:block;font-size:10px;color:var(--mid);margin-bottom:4px;letter-spacing:1px">NICK:</label>
-        <input id="j-nick" type="text" placeholder="ghost" class="inp">
+        <input id="j-nick" type="text" placeholder="ghost" class="inp" maxlength="32">
       </div>
       <button onclick="doJoin()" id="join-btn" class="btn" style="width:100%">CONNECT</button>
       <div id="join-status" style="font-size:10px;text-align:center;min-height:14px"></div>
@@ -214,10 +236,12 @@
   <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--dim);background:var(--bg2);z-index:20">
     <div style="display:flex;align-items:center;gap:10px">
-      <span class="pulse" style="display:inline-block;width:6px;height:6px;background:var(--g);border-radius:50%"></span>
+      <span id="conn-dot" class="status-dot green"></span>
       <span id="room-name" class="glow-sm" style="font-size:13px;color:var(--g)"></span>
       <span style="color:var(--dim)">|</span>
       <span id="room-ttl" style="font-size:10px;color:var(--mid)"></span>
+      <span style="color:var(--dim)">|</span>
+      <span id="room-addr" style="font-size:10px;color:var(--mid)"></span>
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="copyInvite()" class="btn btn-sm">INVITE</button>
@@ -226,13 +250,16 @@
   </div>
 
   <!-- Messages -->
-  <div id="messages" style="flex:1;overflow-y:auto;padding:12px 16px;font-size:12px;line-height:1.7;z-index:20"></div>
+  <div id="messages" style="flex:1;overflow-y:auto;padding:12px 16px;font-size:12px;line-height:1.7;z-index:20;position:relative"></div>
+
+  <!-- New messages pill (4D) -->
+  <div id="new-msg-pill" class="new-msg-pill hidden" onclick="scrollToBottom()">NEW MESSAGES</div>
 
   <!-- Input -->
   <div style="padding:10px 16px;border-top:1px solid var(--dim);background:var(--bg2);z-index:20">
     <div style="display:flex;align-items:center;gap:8px">
       <span id="nick-label" style="color:var(--gd);font-size:12px;white-space:nowrap"></span>
-      <input id="msg-input" type="text" placeholder="..." class="inp" style="border:none;padding:8px 0;background:transparent" onkeydown="if(event.key==='Enter')doSend()">
+      <input id="msg-input" type="text" placeholder="..." class="inp" style="border:none;padding:8px 0;background:transparent" maxlength="4096" onkeydown="if(event.key==='Enter')doSend()">
       <button onclick="doSend()" id="send-btn" class="btn btn-sm" style="white-space:nowrap">SEND</button>
     </div>
     <div id="send-status" style="font-size:9px;color:var(--mid);min-height:12px;margin-top:4px"></div>
@@ -314,28 +341,30 @@
 TWO-BROWSER TEST (recommended):
 
   TAB 1 — ROOM CREATOR:
-  1. Open this page
-  2. Click "GET TESTNET ETH" → complete CAPTCHA (~10s)
-  3. Click CREATE ROOM → name, passphrase, nick, TTL
-  4. Click INVITE → link copied to clipboard
-  5. Send invite link to Tab 2
+  1. Open this page → click CONNECT WALLET
+  2. MetaMask popup → approve + switch to Mendoza
+  3. Get testnet ETH from FAUCET link
+  4. Click CREATE ROOM → name, passphrase, nick, TTL
+  5. Click INVITE → link copied to clipboard
 
-  TAB 2 — JOINER (use incognito or different browser):
-  1. Open the invite link
-  2. Room ID + passphrase auto-fill
-  3. Click "GET TESTNET ETH" → fund THIS wallet too
+  TAB 2 — JOINER (different browser or MetaMask account):
+  1. Open the invite link → CONNECT WALLET
+  2. Fund this account from FAUCET too
+  3. Room ID auto-fills, enter passphrase manually
   4. Enter your nick → JOIN ROOM
 
   VERIFY:
   ✓ Both tabs show "CONNECTED TO..." + system msgs
-  ✓ Tab 1: type message → shows green (local) + "delivered"
+  ✓ Tab 1: type message → MetaMask signs → "delivered"
   ✓ Tab 2: message appears in 2-4 seconds (gray)
   ✓ Tab 2: reply → Tab 1 sees it in 2-4 seconds
   ✓ Wrong passphrase → "COULD NOT DECRYPT" warning
   ✓ After TTL → room + messages auto-purged
 
   IMPORTANT:
-  - Each browser/tab has its OWN wallet (needs own ETH)
+  - Requires MetaMask browser extension
+  - Each account needs own testnet ETH
+  - Mendoza chain auto-added to MetaMask on connect
   - Passphrase must match exactly
   - Messages poll every 2 seconds (not instant)
   - "delivered" = confirmed on-chain</pre>
@@ -361,18 +390,19 @@ BACKEND:   None. Zero. Nada.</pre>
 
 <script type="module">
 // ========== ARKIV SDK ==========
-import { createPublicClient, createWalletClient, http, jsonToPayload } from 'https://esm.sh/@arkiv-network/sdk@0.5.3';
+import { createPublicClient, createWalletClient, http, custom, jsonToPayload } from 'https://esm.sh/@arkiv-network/sdk@0.5.3';
 import { mendoza } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/chains';
-import { privateKeyToAccount, generatePrivateKey } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/accounts';
 import { eq, and } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/query';
 import { ExpirationTime } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/utils';
 
 // ========== CONST ==========
 const T = 'ghostnet', KR = 'room', KM = 'msg';
 const A = { T:'type', K:'kind', R:'roomId', N:'nick', S:'ts' };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ========== STATE ==========
 let wallet, pub, wc, room, seen = new Set(), timer, ttlTimer;
+let pollFails = 0, roomExpired = false, wrongChain = false;
 
 // ========== CRYPTO ==========
 async function dk(pass, rid) {
@@ -396,16 +426,142 @@ function b64e(b) { return btoa(String.fromCharCode(...new Uint8Array(b))); }
 function b64d(s) { return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
 
 // ========== WALLET ==========
-function initWallet() {
-  let pk = localStorage.getItem('ghostnet_pk');
-  if (!pk) { pk = generatePrivateKey(); localStorage.setItem('ghostnet_pk', pk); }
-  const acc = privateKeyToAccount(pk);
-  wallet = { pk, addr: acc.address };
-  pub = createPublicClient({ chain:mendoza, transport:http() });
-  wc = createWalletClient({ chain:mendoza, transport:http(), account:acc });
-  const el = document.getElementById('wallet-status');
-  el.innerHTML = `<span style="color:var(--dim)">WALLET:</span> <span style="color:var(--gd)">${wallet.addr.slice(0,6)}...${wallet.addr.slice(-4)}</span> <span style="color:var(--dim)">—</span> <a href="https://mendoza.hoodi.arkiv.network/faucet/" target="_blank" style="color:var(--g)">GET TESTNET ETH</a>`;
+const MENDOZA_CHAIN_ID = '0xe01c7e440';
+
+function setWalletInfo(address) {
+  const info = document.getElementById('wallet-info');
+  info.innerHTML = '';
+  info.classList.remove('hidden');
+  const dot = document.createElement('span'); dot.style.color = 'var(--g)'; dot.textContent = '\u25CF ';
+  const addr = document.createElement('span'); addr.style.color = 'var(--gd)';
+  addr.textContent = address.slice(0,6) + '...' + address.slice(-4);
+  const sep1 = document.createElement('span'); sep1.style.color = 'var(--dim)'; sep1.textContent = ' | ';
+  const faucet = document.createElement('a'); faucet.href = 'https://mendoza.hoodi.arkiv.network/faucet/';
+  faucet.target = '_blank'; faucet.style.color = 'var(--g)'; faucet.textContent = 'FAUCET';
+  const sep2 = document.createElement('span'); sep2.style.color = 'var(--dim)'; sep2.textContent = ' | ';
+  const explorer = document.createElement('a'); explorer.href = 'https://mendoza.hoodi.arkiv.network/';
+  explorer.target = '_blank'; explorer.style.color = 'var(--gd)'; explorer.textContent = 'EXPLORER';
+  info.append(dot, addr, sep1, faucet, sep2, explorer);
 }
+
+function setWalletError(msg) {
+  const err = document.getElementById('wallet-error');
+  err.classList.remove('hidden');
+  // 1C: use textContent for error, safe DOM for MetaMask link
+  if (msg === 'NO_METAMASK') {
+    err.textContent = '';
+    const txt = document.createTextNode('METAMASK NOT DETECTED \u2014 ');
+    const a = document.createElement('a'); a.href = 'https://metamask.io/download/';
+    a.target = '_blank'; a.style.color = 'var(--g)'; a.textContent = 'INSTALL METAMASK';
+    err.append(txt, a);
+  } else {
+    err.textContent = msg;
+  }
+}
+
+function enableRoomButtons() {
+  const cc = document.getElementById('create-card');
+  const jc = document.getElementById('join-card');
+  cc.disabled = false; cc.style.opacity = '1'; cc.style.cursor = 'pointer';
+  jc.disabled = false; jc.style.opacity = '1'; jc.style.cursor = 'pointer';
+  document.getElementById('wallet-hint').style.display = 'none';
+}
+
+function disableRoomButtons() {
+  const cc = document.getElementById('create-card');
+  const jc = document.getElementById('join-card');
+  cc.disabled = true; cc.style.opacity = '.3'; cc.style.cursor = 'not-allowed';
+  jc.disabled = true; jc.style.opacity = '.3'; jc.style.cursor = 'not-allowed';
+  document.getElementById('wallet-hint').style.display = 'block';
+}
+
+// 1A: MetaMask event listeners
+function setupMetaMaskListeners() {
+  if (!window.ethereum) return;
+
+  window.ethereum.on('accountsChanged', (accounts) => {
+    if (!accounts.length) {
+      // disconnected
+      wallet = null; wc = null;
+      if (room) leaveRoom();
+      document.getElementById('connect-btn').classList.remove('hidden');
+      document.getElementById('connect-btn').disabled = false;
+      document.getElementById('connect-btn').textContent = 'CONNECT WALLET';
+      document.getElementById('wallet-info').classList.add('hidden');
+      disableRoomButtons();
+      return;
+    }
+    const address = accounts[0];
+    wallet = { addr: address };
+    wc = createWalletClient({ chain:mendoza, transport:custom(window.ethereum), account:address });
+    setWalletInfo(address);
+    if (room) {
+      sysMsg(`WALLET CHANGED: ${address.slice(0,6)}...${address.slice(-4)}`);
+      document.getElementById('room-addr').textContent = address.slice(0,6) + '...' + address.slice(-4);
+    }
+  });
+
+  window.ethereum.on('chainChanged', (chainId) => {
+    if (chainId !== MENDOZA_CHAIN_ID) {
+      wrongChain = true;
+      if (room) {
+        sysMsg('WARNING: WRONG CHAIN DETECTED — SWITCH TO MENDOZA');
+        setSendEnabled(false);
+        updConnDot();
+      }
+    } else {
+      if (wrongChain && room) {
+        sysMsg('CHAIN RESTORED: MENDOZA');
+        if (!roomExpired) setSendEnabled(true);
+      }
+      wrongChain = false;
+      updConnDot();
+    }
+  });
+}
+
+window.connectWallet = async () => {
+  const btn = document.getElementById('connect-btn');
+  const err = document.getElementById('wallet-error');
+  err.classList.add('hidden');
+
+  if (!window.ethereum) { setWalletError('NO_METAMASK'); return; }
+
+  btn.disabled = true; btn.textContent = 'CONNECTING...';
+  try {
+    const accounts = await window.ethereum.request({ method:'eth_requestAccounts' });
+    const address = accounts[0];
+
+    // switch/add Mendoza chain
+    try {
+      await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:MENDOZA_CHAIN_ID }] });
+    } catch(switchErr) {
+      if (switchErr.code === 4902) {
+        await window.ethereum.request({ method:'wallet_addEthereumChain', params:[{
+          chainId: MENDOZA_CHAIN_ID,
+          chainName: 'Arkiv Mendoza Testnet',
+          rpcUrls: ['https://mendoza.hoodi.arkiv.network/rpc'],
+          nativeCurrency: { name:'Ethereum', symbol:'ETH', decimals:18 },
+          blockExplorerUrls: ['https://explorer.mendoza.hoodi.arkiv.network']
+        }] });
+      } else throw switchErr;
+    }
+
+    wallet = { addr: address };
+    wc = createWalletClient({ chain:mendoza, transport:custom(window.ethereum), account:address });
+    wrongChain = false;
+
+    btn.classList.add('hidden');
+    setWalletInfo(address);
+    enableRoomButtons();
+    setupMetaMaskListeners();
+    checkHash();
+  } catch(e) {
+    err.classList.remove('hidden');
+    err.textContent = e.code === 4001 ? 'CONNECTION REJECTED BY USER' : 'ERROR: '+(e.shortMessage||e.message);
+    btn.disabled = false; btn.textContent = 'CONNECT WALLET';
+  }
+};
 
 // ========== HELPERS ==========
 function dp(p) { return p ? JSON.parse(new TextDecoder().decode(p)) : {}; }
@@ -420,18 +576,39 @@ function ttl(ca, h) {
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
 // ========== MODALS ==========
-window.showCreate = () => { hideModals(); document.getElementById('create-modal').classList.remove('hidden'); };
-window.showJoin = () => { hideModals(); document.getElementById('join-modal').classList.remove('hidden'); };
+window.showCreate = () => { if (!wallet) return; hideModals(); document.getElementById('create-modal').classList.remove('hidden'); };
+window.showJoin = () => { if (!wallet) return; hideModals(); document.getElementById('join-modal').classList.remove('hidden'); };
 window.hideModals = () => { document.getElementById('create-modal').classList.add('hidden'); document.getElementById('join-modal').classList.add('hidden'); };
+
+// ========== VALIDATION (1B) ==========
+function validatePassphrase(pass, statusEl) {
+  if (pass.length < 4) {
+    statusEl.textContent = '> ERROR: passphrase must be at least 4 characters';
+    statusEl.style.color = '#ff4444';
+    return false;
+  }
+  return true;
+}
+
+// passphrase strength hint
+document.getElementById('c-pass').addEventListener('input', (e) => {
+  const hint = document.getElementById('c-pass-hint');
+  const len = e.target.value.length;
+  if (len === 0) { hint.textContent = ''; }
+  else if (len < 4) { hint.textContent = 'TOO SHORT (min 4)'; hint.style.color = '#ff4444'; }
+  else if (len < 8) { hint.textContent = 'WEAK — USE 8+ CHARS'; hint.style.color = '#ffaa00'; }
+  else { hint.textContent = 'OK'; hint.style.color = 'var(--gd)'; }
+});
 
 // ========== CREATE ==========
 window.doCreate = async () => {
-  const name = document.getElementById('c-name').value.trim()||'unnamed';
+  const name = document.getElementById('c-name').value.trim().slice(0,64)||'unnamed';
   const pass = document.getElementById('c-pass').value;
-  const nick = document.getElementById('c-nick').value.trim()||'ghost';
+  const nick = document.getElementById('c-nick').value.trim().slice(0,32)||'ghost';
   const ttlH = parseInt(document.getElementById('c-ttl').value);
   const st = document.getElementById('create-status');
   if (!pass) { st.textContent='> ERROR: passphrase required'; st.style.color='#ff4444'; return; }
+  if (!validatePassphrase(pass, st)) return;
   const btn = document.getElementById('create-btn');
   btn.disabled=true; btn.textContent='INITIALIZING...';
   st.textContent='> signing transaction...'; st.style.color='var(--gd)';
@@ -459,9 +636,12 @@ window.doCreate = async () => {
 window.doJoin = async () => {
   const rid = document.getElementById('j-room').value.trim();
   const pass = document.getElementById('j-pass').value;
-  const nick = document.getElementById('j-nick').value.trim()||'ghost';
+  const nick = document.getElementById('j-nick').value.trim().slice(0,32)||'ghost';
   const st = document.getElementById('join-status');
   if (!rid||!pass) { st.textContent='> ERROR: room ID + passphrase required'; st.style.color='#ff4444'; return; }
+  // 1B: validate UUID
+  if (!UUID_RE.test(rid)) { st.textContent='> ERROR: invalid room ID format'; st.style.color='#ff4444'; return; }
+  if (!validatePassphrase(pass, st)) return;
   const btn = document.getElementById('join-btn');
   btn.disabled=true; btn.textContent='CONNECTING...';
   st.textContent='> querying room...'; st.style.color='var(--gd)';
@@ -491,20 +671,64 @@ function enterChat() {
   document.getElementById('room-name').textContent = room.name;
   document.getElementById('nick-label').textContent = room.nick + ' $';
   document.getElementById('msg-input').focus();
-  seen.clear(); firstPoll = true;
+  // 4A: show truncated address
+  document.getElementById('room-addr').textContent = wallet.addr.slice(0,6) + '...' + wallet.addr.slice(-4);
+
+  // 2E: restore seen from sessionStorage
+  const stored = sessionStorage.getItem('seen_' + room.roomId);
+  seen = new Set(stored ? JSON.parse(stored) : []);
+  firstPoll = true; pollFails = 0; roomExpired = false;
+
+  // 5A: cache AES key
+  room.key = null;
+  dk(room.passphrase, room.roomId).then(k => { room.key = k; });
+
   document.getElementById('messages').innerHTML = '';
+  document.getElementById('new-msg-pill').classList.add('hidden');
   sysMsg(`CONNECTED TO "${room.name.toUpperCase()}" AS ${room.nick}`);
   sysMsg(`SELF-DESTRUCT: ${room.ttlHours}h // CIPHER: AES-256-GCM // POLL: 2s`);
-  sysMsg('─'.repeat(60));
+  sysMsg('\u2500'.repeat(60));
   updTTL();
+  updConnDot();
   poll();
   timer = setInterval(poll, 2000);
   ttlTimer = setInterval(updTTL, 1000);
+
+  // 4D: track scroll for auto-scroll
+  document.getElementById('messages').addEventListener('scroll', onMsgScroll);
 }
 
+// ========== CONNECTION STATUS DOT (4B) ==========
+function updConnDot() {
+  const dot = document.getElementById('conn-dot');
+  if (!dot) return;
+  dot.className = 'status-dot';
+  if (roomExpired || wrongChain) { dot.classList.add('red'); }
+  else if (pollFails >= 1 && pollFails < 3) { dot.classList.add('yellow'); }
+  else if (pollFails >= 3) { dot.classList.add('red'); }
+  else { dot.classList.add('green'); }
+}
+
+// ========== SEND ENABLED/DISABLED ==========
+function setSendEnabled(enabled) {
+  const btn = document.getElementById('send-btn');
+  const inp = document.getElementById('msg-input');
+  btn.disabled = !enabled;
+  inp.disabled = !enabled;
+}
+
+// ========== TTL (2A) ==========
 function updTTL() {
   if (!room) return;
-  document.getElementById('room-ttl').textContent = 'TTL ' + ttl(room.createdAt, room.ttlHours);
+  const t = ttl(room.createdAt, room.ttlHours);
+  document.getElementById('room-ttl').textContent = 'TTL ' + t;
+  if (t === 'EXPIRED' && !roomExpired) {
+    roomExpired = true;
+    setSendEnabled(false);
+    sysMsg('ROOM EXPIRED — SEND DISABLED');
+    if (timer) { clearInterval(timer); timer = null; }
+    updConnDot();
+  }
 }
 
 function sysMsg(t) {
@@ -513,20 +737,60 @@ function sysMsg(t) {
   el.style.cssText = 'color:var(--mid);font-size:10px;padding:1px 0';
   el.textContent = '> ' + t;
   document.getElementById('messages').appendChild(el);
-  scr();
+  smartScroll();
 }
 
-function addMsg(nick, text, ts, own=false) {
+// 2C: addMsg now returns the element for send feedback
+function addMsg(nick, text, ts, own=false, opts={}) {
   const el = document.createElement('div');
   el.className = 'fade-in';
-  el.style.cssText = `font-size:12px;padding:2px 0;color:${own?'var(--g)':'var(--txt)'}`;
+  const dimStyle = opts.pending ? 'opacity:.4;' : '';
+  el.style.cssText = `font-size:12px;padding:2px 0;color:${own?'var(--g)':'var(--txt)'};${dimStyle}`;
   el.innerHTML = `<span style="color:var(--dim)">[${tf(ts)}]</span> <span style="color:${own?'var(--gd)':'#6688cc'}">${esc(nick)}</span> <span style="color:var(--dim)">></span> ${esc(text)}`;
+  if (opts.id) el.dataset.msgId = opts.id;
   document.getElementById('messages').appendChild(el);
-  scr();
+  smartScroll();
+  return el;
 }
 
-function scr() { const m=document.getElementById('messages'); m.scrollTop=m.scrollHeight; }
+// 4D: smart auto-scroll
+let userScrolledUp = false;
+function onMsgScroll() {
+  const m = document.getElementById('messages');
+  const atBottom = m.scrollHeight - m.scrollTop - m.clientHeight < 40;
+  userScrolledUp = !atBottom;
+  if (atBottom) document.getElementById('new-msg-pill').classList.add('hidden');
+}
 
+function smartScroll() {
+  if (!userScrolledUp) {
+    const m = document.getElementById('messages');
+    m.scrollTop = m.scrollHeight;
+  }
+}
+
+function showNewMsgPill() {
+  if (userScrolledUp) {
+    document.getElementById('new-msg-pill').classList.remove('hidden');
+  }
+}
+
+window.scrollToBottom = () => {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+  userScrolledUp = false;
+  document.getElementById('new-msg-pill').classList.add('hidden');
+};
+
+// ========== SEEN PERSISTENCE (2E) ==========
+function persistSeen() {
+  if (!room) return;
+  try {
+    sessionStorage.setItem('seen_' + room.roomId, JSON.stringify([...seen]));
+  } catch(e) { /* sessionStorage full — ignore */ }
+}
+
+// ========== POLL ==========
 let polling = false, firstPoll = true;
 async function poll() {
   if (!room || polling) return;
@@ -535,7 +799,11 @@ async function poll() {
     const r = await pub.buildQuery()
       .where(and([eq(A.T,T),eq(A.K,KM),eq(A.R,room.roomId)]))
       .withAttributes().withPayload().limit(200).fetch();
-    const k = await dk(room.passphrase, room.roomId);
+
+    // 5A: use cached key
+    const k = room.key || await dk(room.passphrase, room.roomId);
+    if (!room.key) room.key = k;
+
     const nm = [];
     let decryptFails = 0;
     for (const e of r.entities) {
@@ -551,28 +819,63 @@ async function poll() {
       }
     }
     nm.sort((a,b)=>a.ts-b.ts);
-    for (const m of nm) addMsg(m.nick, m.text, m.ts, m.nick===room.nick);
+    for (const m of nm) {
+      addMsg(m.nick, m.text, m.ts, m.nick===room.nick);
+    }
+    if (nm.length) { persistSeen(); showNewMsgPill(); }
+
     if (firstPoll) {
       firstPoll = false;
       if (nm.length) sysMsg(`LOADED ${nm.length} MESSAGE${nm.length>1?'S':''}`);
       else if (r.entities.length === 0) sysMsg('NO MESSAGES YET');
-      else if (decryptFails > 0) sysMsg(`FOUND ${r.entities.length} ENCRYPTED MESSAGE${r.entities.length>1?'S':''} — COULD NOT DECRYPT (WRONG PASSPHRASE?)`);
+      else if (decryptFails > 0) sysMsg(`FOUND ${r.entities.length} ENCRYPTED MESSAGE${r.entities.length>1?'S':''} \u2014 COULD NOT DECRYPT (WRONG PASSPHRASE?)`);
     }
-  } catch(e) { console.error('poll:',e); }
+
+    // 2D: message limit warning
+    if (r.entities.length >= 200 && firstPoll === false) {
+      sysMsg('SHOWING LATEST 200 MESSAGES');
+    }
+
+    // 2B: reset fail counter on success
+    if (pollFails >= 3) sysMsg('RECONNECTED');
+    pollFails = 0;
+    updConnDot();
+
+  } catch(e) {
+    console.error('poll:', e);
+    // 2B: RPC failure resilience
+    pollFails++;
+    updConnDot();
+    if (pollFails === 3) sysMsg('CONNECTION LOST \u2014 RETRYING...');
+  }
   polling = false;
 }
 
-// ========== SEND ==========
+// ========== SEND (2C + 4E) ==========
 window.doSend = async () => {
+  if (roomExpired || wrongChain) return;
   const inp = document.getElementById('msg-input');
+  const sendBtn = document.getElementById('send-btn');
   const txt = inp.value.trim();
-  if (!txt) return;
+  if (!txt || sendBtn.disabled) return;
   inp.value = '';
   const ts = Math.floor(Date.now()/1000);
-  addMsg(room.nick, txt, ts, true);
+  const msgId = 'pending_' + ts + '_' + Math.random();
+
+  // 2C: show dimmed message
+  const msgEl = addMsg(room.nick, txt, ts, true, { pending:true, id:msgId });
+
+  // 4E: disable send during TX
+  sendBtn.disabled = true; sendBtn.textContent = 'SIGNING...';
+  inp.disabled = true;
   const st = document.getElementById('send-status');
+  st.textContent = '> signing...'; st.style.color = 'var(--mid)';
+
   try {
-    const k = await dk(room.passphrase, room.roomId);
+    // 5A: use cached key
+    const k = room.key || await dk(room.passphrase, room.roomId);
+    if (!room.key) room.key = k;
+
     const e = await enc(txt, k);
     const r = await wc.createEntity({
       payload:jsonToPayload(e),
@@ -584,27 +887,48 @@ window.doSend = async () => {
       expiresIn:ExpirationTime.fromHours(room.ttlHours),
     });
     seen.add(r.entityKey);
+    persistSeen();
+    // 2C: solidify message
+    msgEl.style.opacity = '1';
     st.textContent='> delivered'; st.style.color='var(--gd)';
     setTimeout(()=>{st.textContent='';},2000);
   } catch(e) {
+    // 2C: mark failed
+    msgEl.style.opacity = '1';
+    const fail = document.createElement('span');
+    fail.style.cssText = 'color:#ff4444;font-size:10px;margin-left:8px';
+    fail.textContent = '(FAILED)';
+    msgEl.appendChild(fail);
     st.textContent = e.message?.includes('insufficient') ? '> need testnet ETH' : '> send failed: '+(e.shortMessage||e.message);
     st.style.color='#ff4444';
     setTimeout(()=>{st.textContent='';},5000);
+  } finally {
+    // 4E: re-enable send
+    if (!roomExpired && !wrongChain) {
+      sendBtn.disabled = false; inp.disabled = false;
+    }
+    sendBtn.textContent = 'SEND';
+    inp.focus();
   }
 };
 
-// ========== INVITE ==========
+// ========== INVITE (1D) ==========
 window.copyInvite = () => {
-  const url = `${location.origin}${location.pathname}#roomId=${room.roomId}&pass=${encodeURIComponent(room.passphrase)}`;
-  navigator.clipboard.writeText(url).then(()=>sysMsg('INVITE LINK COPIED')).catch(()=>sysMsg('INVITE: '+url));
+  // 1D: only roomId in URL, no passphrase
+  const url = `${location.origin}${location.pathname}#roomId=${room.roomId}`;
+  navigator.clipboard.writeText(url).then(()=>{
+    sysMsg('INVITE LINK COPIED (ROOM ID ONLY)');
+    sysMsg('SHARE PASSPHRASE SEPARATELY (VERBAL / SECURE CHANNEL)');
+  }).catch(()=>sysMsg('INVITE: '+url));
 };
 
 // ========== LEAVE ==========
 window.leaveRoom = () => {
   if (timer) clearInterval(timer);
   if (ttlTimer) clearInterval(ttlTimer);
-  polling = false;
+  polling = false; pollFails = 0; roomExpired = false; userScrolledUp = false;
   room=null; seen.clear();
+  document.getElementById('messages').removeEventListener('scroll', onMsgScroll);
   document.getElementById('chat-view').classList.add('hidden');
   document.getElementById('chat-view').style.display='none';
   document.getElementById('landing').style.display='flex';
@@ -614,24 +938,27 @@ window.leaveRoom = () => {
   document.getElementById('join-btn').textContent='CONNECT';
   document.getElementById('create-status').textContent='';
   document.getElementById('join-status').textContent='';
+  document.getElementById('send-btn').disabled=false;
+  document.getElementById('send-btn').textContent='SEND';
+  document.getElementById('msg-input').disabled=false;
 };
 
-// ========== AUTO-JOIN ==========
+// ========== AUTO-JOIN (1D) ==========
 function checkHash() {
   const h = location.hash.slice(1);
   if (!h) return;
   const p = new URLSearchParams(h);
-  const rid=p.get('roomId'), pass=p.get('pass');
-  if (rid&&pass) {
-    document.getElementById('j-room').value=rid;
-    document.getElementById('j-pass').value=pass;
+  const rid = p.get('roomId');
+  // 1B: validate UUID in hash
+  if (rid && UUID_RE.test(rid)) {
+    document.getElementById('j-room').value = rid;
+    // 1D: no passphrase auto-fill from URL
     showJoin();
   }
 }
 
 // ========== INIT ==========
-initWallet();
-checkHash();
+pub = createPublicClient({ chain:mendoza, transport:http() });
 </script>
 </body>
 </html>
