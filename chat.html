@@ -156,7 +156,7 @@
         </button>
       </div>
       <!-- 4C: Hint text -->
-      <div id="wallet-hint" style="text-align:center;font-size:9px;color:var(--mid);margin-top:-24px;margin-bottom:24px;letter-spacing:1px">CONNECT WALLET TO CONTINUE</div>
+      <div id="wallet-hint" style="text-align:center;font-size:9px;color:var(--mid);margin-top:-8px;margin-bottom:16px;letter-spacing:1px">CONNECT WALLET TO CONTINUE</div>
     </div>
   </div>
 
@@ -429,6 +429,15 @@ function b64d(s) { return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
 const MENDOZA_CHAIN_ID = '0xe01c7e440';
 const MENDOZA_CHAIN_IDS = new Set([MENDOZA_CHAIN_ID, '0xe0087f840']); // accept known Arkiv chain IDs
 
+// build chain config matching MetaMask's actual chain ID
+function getActiveChain() {
+  if (!window.ethereum) return mendoza;
+  const cid = window.ethereum.chainId;
+  if (!cid || !MENDOZA_CHAIN_IDS.has(cid)) return mendoza;
+  if (cid === MENDOZA_CHAIN_ID) return mendoza;
+  return { ...mendoza, id: parseInt(cid, 16) };
+}
+
 function setWalletInfo(address) {
   const info = document.getElementById('wallet-info');
   info.innerHTML = '';
@@ -494,7 +503,7 @@ function setupMetaMaskListeners() {
     }
     const address = accounts[0];
     wallet = { addr: address };
-    wc = createWalletClient({ chain:mendoza, transport:custom(window.ethereum), account:address });
+    wc = createWalletClient({ chain:getActiveChain(), transport:custom(window.ethereum), account:address });
     setWalletInfo(address);
     if (room) {
       sysMsg(`WALLET CHANGED: ${address.slice(0,6)}...${address.slice(-4)}`);
@@ -511,6 +520,8 @@ function setupMetaMaskListeners() {
         updConnDot();
       }
     } else {
+      // recreate wallet client with correct chain ID
+      if (wallet) wc = createWalletClient({ chain:getActiveChain(), transport:custom(window.ethereum), account:wallet.addr });
       if (wrongChain && room) {
         sysMsg('CHAIN RESTORED: MENDOZA');
         if (!roomExpired) setSendEnabled(true);
@@ -557,7 +568,7 @@ window.connectWallet = async () => {
     }
 
     wallet = { addr: address };
-    wc = createWalletClient({ chain:mendoza, transport:custom(window.ethereum), account:address });
+    wc = createWalletClient({ chain:getActiveChain(), transport:custom(window.ethereum), account:address });
     wrongChain = false;
 
     btn.classList.add('hidden');
