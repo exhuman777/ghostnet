@@ -1,0 +1,24 @@
+{
+  "name": "ghostnet",
+  "version": "0.1.0",
+  "description": "Ephemeral encrypted chat on Arkiv L3",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ghostnet": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@arkiv-network/sdk": "^0.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GhostNet — Ephemeral Encrypted Chat</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        ghost: { 50:'#f0fdf4', 100:'#dcfce7', 400:'#4ade80', 500:'#22c55e', 600:'#16a34a', 900:'#0a0f0d' },
+        dark: { 800:'#111714', 900:'#090d0b', 950:'#050805' }
+      }
+    }
+  }
+}
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+  body { font-family: 'Space Grotesk', sans-serif; background: #050805; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .glow { text-shadow: 0 0 20px rgba(74,222,128,0.3), 0 0 40px rgba(74,222,128,0.1); }
+  .glow-border { box-shadow: 0 0 15px rgba(74,222,128,0.1), inset 0 0 15px rgba(74,222,128,0.05); }
+  .pulse-dot { animation: pulse-dot 2s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:.4} 50%{opacity:1} }
+  .fade-in { animation: fadeIn .3s ease-out; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .scan-line { background: linear-gradient(transparent 50%, rgba(74,222,128,0.02) 50%); background-size: 100% 4px; pointer-events: none; }
+  #messages::-webkit-scrollbar { width: 4px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: rgba(74,222,128,0.2); border-radius: 2px; }
+  input:focus, textarea:focus { outline: none; }
+</style>
+</head>
+<body class="min-h-screen text-gray-300 overflow-hidden">
+
+<!-- ========== LANDING PAGE ========== -->
+<div id="landing" class="min-h-screen flex flex-col">
+  <!-- Nav -->
+  <nav class="flex items-center justify-between px-6 py-4 border-b border-ghost-400/10">
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full bg-ghost-400 pulse-dot"></div>
+      <span class="mono text-ghost-400 font-semibold text-sm tracking-wider">GHOSTNET</span>
+    </div>
+    <div class="flex items-center gap-4 text-xs mono text-gray-500">
+      <span>AES-256-GCM</span>
+      <span class="text-ghost-400/40">|</span>
+      <span>ARKIV L3</span>
+      <span class="text-ghost-400/40">|</span>
+      <span>ZERO SERVER</span>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="flex-1 flex items-center justify-center px-6">
+    <div class="max-w-2xl w-full text-center">
+      <div class="mb-8">
+        <h1 class="text-5xl md:text-6xl font-bold text-white glow mb-4 tracking-tight">
+          Ghost<span class="text-ghost-400">Net</span>
+        </h1>
+        <p class="text-lg text-gray-400 max-w-md mx-auto">
+          Ephemeral encrypted chat rooms that self-destruct. No servers. No accounts. No trace.
+        </p>
+      </div>
+
+      <!-- Feature pills -->
+      <div class="flex flex-wrap justify-center gap-2 mb-10 text-xs mono">
+        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">End-to-end encrypted</span>
+        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">Auto self-destruct</span>
+        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">On-chain storage</span>
+        <span class="px-3 py-1.5 rounded-full border border-ghost-400/20 text-ghost-400/70">Zero knowledge</span>
+      </div>
+
+      <!-- Action cards -->
+      <div class="grid md:grid-cols-2 gap-4 max-w-lg mx-auto">
+        <!-- Create Room -->
+        <button onclick="showCreate()" class="group p-5 rounded-xl border border-ghost-400/20 bg-dark-900/50 hover:border-ghost-400/40 hover:bg-dark-800/50 transition-all text-left glow-border">
+          <div class="text-ghost-400 text-2xl mb-2">+</div>
+          <div class="text-white font-semibold mb-1">Create Room</div>
+          <div class="text-xs text-gray-500">Start a new encrypted chat room</div>
+        </button>
+        <!-- Join Room -->
+        <button onclick="showJoin()" class="group p-5 rounded-xl border border-ghost-400/20 bg-dark-900/50 hover:border-ghost-400/40 hover:bg-dark-800/50 transition-all text-left glow-border">
+          <div class="text-ghost-400 text-2xl mb-2">→</div>
+          <div class="text-white font-semibold mb-1">Join Room</div>
+          <div class="text-xs text-gray-500">Enter with room ID + passphrase</div>
+        </button>
+      </div>
+
+      <!-- Wallet status -->
+      <div id="wallet-status" class="mt-8 text-xs mono text-gray-600"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="px-6 py-4 border-t border-ghost-400/5 text-center text-xs text-gray-600 mono">
+    Messages stored on <a href="https://arkiv.network" target="_blank" class="text-ghost-400/50 hover:text-ghost-400">Arkiv L3</a> — encrypted with AES-256-GCM — keys never leave your browser
+  </footer>
+</div>
+
+<!-- ========== CREATE ROOM MODAL ========== -->
+<div id="create-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center px-4 hidden z-50">
+  <div class="bg-dark-800 border border-ghost-400/20 rounded-xl p-6 w-full max-w-md fade-in glow-border">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-white font-semibold">Create Room</h2>
+      <button onclick="hideModals()" class="text-gray-500 hover:text-white text-xl">&times;</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs mono text-gray-500 mb-1">ROOM NAME</label>
+        <input id="c-name" type="text" placeholder="secret-ops" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+      </div>
+      <div>
+        <label class="block text-xs mono text-gray-500 mb-1">PASSPHRASE</label>
+        <input id="c-pass" type="password" placeholder="strong-passphrase" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+      </div>
+      <div>
+        <label class="block text-xs mono text-gray-500 mb-1">YOUR NICK</label>
+        <input id="c-nick" type="text" placeholder="ghost" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+      </div>
+      <div>
+        <label class="block text-xs mono text-gray-500 mb-1">SELF-DESTRUCT</label>
+        <select id="c-ttl" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+          <option value="1">1 hour</option>
+          <option value="3">3 hours</option>
+          <option value="6">6 hours</option>
+          <option value="12" selected>12 hours</option>
+          <option value="24">24 hours</option>
+        </select>
+      </div>
+      <button onclick="doCreate()" id="create-btn" class="w-full py-2.5 rounded-lg bg-ghost-400/20 text-ghost-400 font-semibold hover:bg-ghost-400/30 transition mono text-sm">
+        CREATE ROOM
+      </button>
+      <div id="create-status" class="text-xs mono text-center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== JOIN ROOM MODAL ========== -->
+<div id="join-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center px-4 hidden z-50">
+  <div class="bg-dark-800 border border-ghost-400/20 rounded-xl p-6 w-full max-w-md fade-in glow-border">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-white font-semibold">Join Room</h2>
+      <button onclick="hideModals()" class="text-gray-500 hover:text-white text-xl">&times;</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs mono text-gray-500 mb-1">ROOM ID</label>
+        <input id="j-room" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+      </div>
+      <div>
+        <label class="block text-xs mono text-gray-500 mb-1">PASSPHRASE</label>
+        <input id="j-pass" type="password" placeholder="passphrase" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+      </div>
+      <div>
+        <label class="block text-xs mono text-gray-500 mb-1">YOUR NICK</label>
+        <input id="j-nick" type="text" placeholder="ghost" class="w-full bg-dark-950 border border-ghost-400/10 rounded-lg px-3 py-2.5 text-white mono text-sm focus:border-ghost-400/40 transition">
+      </div>
+      <button onclick="doJoin()" id="join-btn" class="w-full py-2.5 rounded-lg bg-ghost-400/20 text-ghost-400 font-semibold hover:bg-ghost-400/30 transition mono text-sm">
+        JOIN ROOM
+      </button>
+      <div id="join-status" class="text-xs mono text-center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CHAT VIEW ========== -->
+<div id="chat-view" class="fixed inset-0 flex flex-col hidden">
+  <!-- Scan line overlay -->
+  <div class="scan-line fixed inset-0 z-10"></div>
+
+  <!-- Chat header -->
+  <div class="relative z-20 flex items-center justify-between px-4 py-3 border-b border-ghost-400/10 bg-dark-950/95 backdrop-blur">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 rounded-full bg-ghost-400 pulse-dot"></div>
+      <div>
+        <span id="room-name" class="text-white font-semibold text-sm"></span>
+        <span id="room-ttl" class="text-xs mono text-gray-500 ml-2"></span>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="copyInvite()" class="text-xs mono px-3 py-1.5 rounded border border-ghost-400/20 text-ghost-400/70 hover:text-ghost-400 hover:border-ghost-400/40 transition" title="Copy invite link">
+        INVITE
+      </button>
+      <button onclick="leaveRoom()" class="text-xs mono px-3 py-1.5 rounded border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/40 transition">
+        LEAVE
+      </button>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div id="messages" class="relative z-20 flex-1 overflow-y-auto px-4 py-4 space-y-1 mono text-sm">
+    <!-- Messages render here -->
+  </div>
+
+  <!-- Input bar -->
+  <div class="relative z-20 px-4 py-3 border-t border-ghost-400/10 bg-dark-950/95 backdrop-blur">
+    <div class="flex items-center gap-2">
+      <span id="nick-label" class="text-ghost-400/60 mono text-sm"></span>
+      <input id="msg-input" type="text" placeholder="type a message..." class="flex-1 bg-transparent text-white mono text-sm focus:outline-none" onkeydown="if(event.key==='Enter')doSend()">
+      <button onclick="doSend()" id="send-btn" class="px-4 py-1.5 rounded bg-ghost-400/20 text-ghost-400 mono text-xs hover:bg-ghost-400/30 transition">
+        SEND
+      </button>
+    </div>
+    <div id="send-status" class="text-xs mono mt-1 text-gray-600"></div>
+  </div>
+</div>
+
+<script type="module">
+// ========== ARKIV SDK (ESM CDN) ==========
+import { createPublicClient, createWalletClient, http, jsonToPayload } from 'https://esm.sh/@arkiv-network/sdk@0.5.3';
+import { mendoza } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/chains';
+import { privateKeyToAccount, generatePrivateKey } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/accounts';
+import { eq, and } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/query';
+import { ExpirationTime } from 'https://esm.sh/@arkiv-network/sdk@0.5.3/utils';
+
+// ========== CONSTANTS ==========
+const GHOSTNET_TYPE = 'ghostnet';
+const KIND_ROOM = 'room';
+const KIND_MSG = 'msg';
+const ATTR = { TYPE: 'type', KIND: 'kind', ROOM_ID: 'roomId', NICK: 'nick', TS: 'ts' };
+
+// ========== STATE ==========
+let wallet = null;
+let publicClient = null;
+let walletClient = null;
+let currentRoom = null;  // { roomId, passphrase, nick, name, ttlHours, createdAt }
+let seenKeys = new Set();
+let pollTimer = null;
+
+// ========== CRYPTO (browser Web Crypto API) ==========
+async function deriveKey(passphrase, roomId) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc.encode(roomId), iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false, ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptMsg(text, key) {
+  const enc = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
+  return { iv: b64encode(iv), ct: b64encode(new Uint8Array(ct)) };
+}
+
+async function decryptMsg(payload, key) {
+  const iv = b64decode(payload.iv);
+  const ct = b64decode(payload.ct);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return new TextDecoder().decode(plain);
+}
+
+function b64encode(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64decode(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+
+// ========== WALLET ==========
+function initWallet() {
+  let pk = localStorage.getItem('ghostnet_pk');
+  if (!pk) {
+    pk = generatePrivateKey();
+    localStorage.setItem('ghostnet_pk', pk);
+  }
+  const account = privateKeyToAccount(pk);
+  wallet = { privateKey: pk, address: account.address };
+  publicClient = createPublicClient({ chain: mendoza, transport: http() });
+  walletClient = createWalletClient({ chain: mendoza, transport: http(), account });
+
+  const statusEl = document.getElementById('wallet-status');
+  statusEl.innerHTML = `wallet: <span class="text-ghost-400/50">${wallet.address.slice(0,6)}...${wallet.address.slice(-4)}</span> — <a href="https://mendoza.hoodi.arkiv.network/faucet/" target="_blank" class="text-ghost-400/70 underline hover:text-ghost-400">get testnet ETH</a>`;
+}
+
+// ========== HELPERS ==========
+function decodePayload(payload) {
+  if (!payload) return {};
+  return JSON.parse(new TextDecoder().decode(payload));
+}
+
+function attrsToMap(attrs) {
+  const m = {};
+  for (const a of attrs) m[a.key] = String(a.value);
+  return m;
+}
+
+function timeAgo(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function ttlCountdown(createdAt, ttlHours) {
+  const end = createdAt + ttlHours * 3600 * 1000;
+  const left = end - Date.now();
+  if (left <= 0) return 'expired';
+  const h = Math.floor(left / 3600000);
+  const m = Math.floor((left % 3600000) / 60000);
+  return `${h}h ${m}m left`;
+}
+
+// ========== MODALS ==========
+window.showCreate = () => { hideModals(); document.getElementById('create-modal').classList.remove('hidden'); };
+window.showJoin = () => { hideModals(); document.getElementById('join-modal').classList.remove('hidden'); };
+window.hideModals = () => {
+  document.getElementById('create-modal').classList.add('hidden');
+  document.getElementById('join-modal').classList.add('hidden');
+};
+
+// ========== CREATE ROOM ==========
+window.doCreate = async () => {
+  const name = document.getElementById('c-name').value.trim() || 'unnamed';
+  const pass = document.getElementById('c-pass').value;
+  const nick = document.getElementById('c-nick').value.trim() || 'ghost';
+  const ttl = parseInt(document.getElementById('c-ttl').value);
+  const statusEl = document.getElementById('create-status');
+
+  if (!pass) { statusEl.textContent = 'passphrase required'; statusEl.className = 'text-xs mono text-center text-red-400'; return; }
+
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true; btn.textContent = 'CREATING...';
+  statusEl.textContent = 'signing transaction...';
+  statusEl.className = 'text-xs mono text-center text-ghost-400/50';
+
+  try {
+    const roomId = crypto.randomUUID();
+    const meta = { name, createdBy: nick, ttlHours: ttl, createdAt: Date.now() };
+    await walletClient.createEntity({
+      payload: jsonToPayload(meta),
+      attributes: [
+        { key: ATTR.TYPE, value: GHOSTNET_TYPE },
+        { key: ATTR.KIND, value: KIND_ROOM },
+        { key: ATTR.ROOM_ID, value: roomId },
+        { key: ATTR.NICK, value: nick },
+        { key: ATTR.TS, value: String(Math.floor(Date.now() / 1000)) },
+      ],
+      contentType: 'application/json',
+      expiresIn: ExpirationTime.fromHours(ttl),
+    });
+
+    currentRoom = { roomId, passphrase: pass, nick, name, ttlHours: ttl, createdAt: Date.now() };
+    enterChat();
+  } catch (e) {
+    statusEl.textContent = e.message?.includes('insufficient') ? 'Need testnet ETH — use faucet link below' : 'Error: ' + (e.shortMessage || e.message);
+    statusEl.className = 'text-xs mono text-center text-red-400';
+    btn.disabled = false; btn.textContent = 'CREATE ROOM';
+  }
+};
+
+// ========== JOIN ROOM ==========
+window.doJoin = async () => {
+  const roomId = document.getElementById('j-room').value.trim();
+  const pass = document.getElementById('j-pass').value;
+  const nick = document.getElementById('j-nick').value.trim() || 'ghost';
+  const statusEl = document.getElementById('join-status');
+
+  if (!roomId || !pass) { statusEl.textContent = 'room ID and passphrase required'; statusEl.className = 'text-xs mono text-center text-red-400'; return; }
+
+  const btn = document.getElementById('join-btn');
+  btn.disabled = true; btn.textContent = 'JOINING...';
+  statusEl.textContent = 'looking up room...';
+  statusEl.className = 'text-xs mono text-center text-ghost-400/50';
+
+  try {
+    const result = await publicClient.buildQuery()
+      .where(and([eq(ATTR.TYPE, GHOSTNET_TYPE), eq(ATTR.KIND, KIND_ROOM), eq(ATTR.ROOM_ID, roomId)]))
+      .withAttributes().withPayload().limit(1).fetch();
+
+    if (!result.entities.length) {
+      statusEl.textContent = 'room not found or expired';
+      statusEl.className = 'text-xs mono text-center text-red-400';
+      btn.disabled = false; btn.textContent = 'JOIN ROOM';
+      return;
+    }
+
+    const room = decodePayload(result.entities[0].payload);
+    currentRoom = { roomId, passphrase: pass, nick, name: room.name, ttlHours: room.ttlHours, createdAt: room.createdAt };
+    enterChat();
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + (e.shortMessage || e.message);
+    statusEl.className = 'text-xs mono text-center text-red-400';
+    btn.disabled = false; btn.textContent = 'JOIN ROOM';
+  }
+};
+
+// ========== CHAT ==========
+function enterChat() {
+  hideModals();
+  document.getElementById('landing').classList.add('hidden');
+  document.getElementById('chat-view').classList.remove('hidden');
+  document.getElementById('room-name').textContent = currentRoom.name;
+  document.getElementById('nick-label').textContent = currentRoom.nick + ' >';
+  document.getElementById('msg-input').focus();
+  seenKeys.clear();
+  document.getElementById('messages').innerHTML = '';
+  addSystemMsg(`Joined room "${currentRoom.name}" as ${currentRoom.nick}`);
+  addSystemMsg(`Room self-destructs in ${currentRoom.ttlHours}h — all messages encrypted with AES-256-GCM`);
+  updateTTL();
+  pollMessages();
+  pollTimer = setInterval(pollMessages, 2000);
+  setInterval(updateTTL, 30000);
+}
+
+function updateTTL() {
+  document.getElementById('room-ttl').textContent = ttlCountdown(currentRoom.createdAt, currentRoom.ttlHours);
+}
+
+function addSystemMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'text-ghost-400/40 text-xs py-1 fade-in';
+  el.textContent = `> ${text}`;
+  document.getElementById('messages').appendChild(el);
+  scrollToBottom();
+}
+
+function addMessage(nick, text, ts, isOwn = false) {
+  const el = document.createElement('div');
+  el.className = `py-0.5 fade-in ${isOwn ? 'text-ghost-400/80' : 'text-gray-400'}`;
+  const time = timeAgo(ts);
+  el.innerHTML = `<span class="text-gray-600">[${time}]</span> <span class="${isOwn ? 'text-ghost-400' : 'text-blue-400/80'}">${escHtml(nick)}</span>: ${escHtml(text)}`;
+  document.getElementById('messages').appendChild(el);
+  scrollToBottom();
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function scrollToBottom() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+
+async function pollMessages() {
+  if (!currentRoom) return;
+  try {
+    const result = await publicClient.buildQuery()
+      .where(and([eq(ATTR.TYPE, GHOSTNET_TYPE), eq(ATTR.KIND, KIND_MSG), eq(ATTR.ROOM_ID, currentRoom.roomId)]))
+      .withAttributes().withPayload().limit(200).fetch();
+
+    const key = await deriveKey(currentRoom.passphrase, currentRoom.roomId);
+    const newMsgs = [];
+
+    for (const e of result.entities) {
+      if (seenKeys.has(e.key)) continue;
+      seenKeys.add(e.key);
+      const attrs = attrsToMap(e.attributes);
+      const payload = decodePayload(e.payload);
+      try {
+        const text = await decryptMsg(payload, key);
+        newMsgs.push({ nick: attrs[ATTR.NICK], text, ts: Number(attrs[ATTR.TS]) });
+      } catch { /* wrong key — skip */ }
+    }
+
+    newMsgs.sort((a, b) => a.ts - b.ts);
+    for (const m of newMsgs) {
+      addMessage(m.nick, m.text, m.ts, m.nick === currentRoom.nick);
+    }
+  } catch (e) {
+    console.error('poll error:', e);
+  }
+}
+
+// ========== SEND MESSAGE ==========
+window.doSend = async () => {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const ts = Math.floor(Date.now() / 1000);
+  // optimistic display
+  addMessage(currentRoom.nick, text, ts, true);
+
+  const statusEl = document.getElementById('send-status');
+  try {
+    const key = await deriveKey(currentRoom.passphrase, currentRoom.roomId);
+    const encrypted = await encryptMsg(text, key);
+    const result = await walletClient.createEntity({
+      payload: jsonToPayload(encrypted),
+      attributes: [
+        { key: ATTR.TYPE, value: GHOSTNET_TYPE },
+        { key: ATTR.KIND, value: KIND_MSG },
+        { key: ATTR.ROOM_ID, value: currentRoom.roomId },
+        { key: ATTR.NICK, value: currentRoom.nick },
+        { key: ATTR.TS, value: String(ts) },
+      ],
+      contentType: 'application/json',
+      expiresIn: ExpirationTime.fromHours(currentRoom.ttlHours),
+    });
+    // mark as seen so poll doesn't re-add
+    seenKeys.add(result.entityKey);
+    statusEl.textContent = '';
+  } catch (e) {
+    statusEl.textContent = e.message?.includes('insufficient') ? 'need testnet ETH' : 'send failed';
+    statusEl.className = 'text-xs mono mt-1 text-red-400';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  }
+};
+
+// ========== INVITE ==========
+window.copyInvite = () => {
+  const url = `${location.origin}${location.pathname}#roomId=${currentRoom.roomId}&pass=${encodeURIComponent(currentRoom.passphrase)}`;
+  navigator.clipboard.writeText(url).then(() => {
+    addSystemMsg('Invite link copied to clipboard');
+  }).catch(() => {
+    addSystemMsg('Copy this invite: ' + url);
+  });
+};
+
+// ========== LEAVE ==========
+window.leaveRoom = () => {
+  if (pollTimer) clearInterval(pollTimer);
+  currentRoom = null;
+  seenKeys.clear();
+  document.getElementById('chat-view').classList.add('hidden');
+  document.getElementById('landing').classList.remove('hidden');
+  // reset modals
+  document.getElementById('create-btn').disabled = false;
+  document.getElementById('create-btn').textContent = 'CREATE ROOM';
+  document.getElementById('join-btn').disabled = false;
+  document.getElementById('join-btn').textContent = 'JOIN ROOM';
+  document.getElementById('create-status').textContent = '';
+  document.getElementById('join-status').textContent = '';
+};
+
+// ========== AUTO-JOIN FROM URL HASH ==========
+function checkHash() {
+  const hash = location.hash.slice(1);
+  if (!hash) return;
+  const params = new URLSearchParams(hash);
+  const roomId = params.get('roomId');
+  const pass = params.get('pass');
+  if (roomId && pass) {
+    document.getElementById('j-room').value = roomId;
+    document.getElementById('j-pass').value = pass;
+    showJoin();
+  }
+}
+
+// ========== INIT ==========
+initWallet();
+checkHash();
+</script>
+</body>
+</html>
