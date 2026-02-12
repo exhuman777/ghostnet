@@ -311,13 +311,34 @@
       <p style="color:var(--g);font-size:13px;margin-bottom:16px;margin-top:32px;letter-spacing:2px">// HOW TO TEST</p>
 
       <pre style="color:var(--mid);font-size:10px;line-height:1.6;margin-bottom:16px">
-STEP 1: Open this page
-STEP 2: Click "get testnet ETH" below → complete CAPTCHA (~10s)
-STEP 3: Create Room → fill name, passphrase, nick, TTL
-STEP 4: Click INVITE → send link to friend
-STEP 5: Friend opens link → enters nick → joins
-STEP 6: Chat. Messages appear in 2-4 seconds.
-STEP 7: After TTL expires — everything vanishes.</pre>
+TWO-BROWSER TEST (recommended):
+
+  TAB 1 — ROOM CREATOR:
+  1. Open this page
+  2. Click "GET TESTNET ETH" → complete CAPTCHA (~10s)
+  3. Click CREATE ROOM → name, passphrase, nick, TTL
+  4. Click INVITE → link copied to clipboard
+  5. Send invite link to Tab 2
+
+  TAB 2 — JOINER (use incognito or different browser):
+  1. Open the invite link
+  2. Room ID + passphrase auto-fill
+  3. Click "GET TESTNET ETH" → fund THIS wallet too
+  4. Enter your nick → JOIN ROOM
+
+  VERIFY:
+  ✓ Both tabs show "CONNECTED TO..." + system msgs
+  ✓ Tab 1: type message → shows green (local) + "delivered"
+  ✓ Tab 2: message appears in 2-4 seconds (gray)
+  ✓ Tab 2: reply → Tab 1 sees it in 2-4 seconds
+  ✓ Wrong passphrase → "COULD NOT DECRYPT" warning
+  ✓ After TTL → room + messages auto-purged
+
+  IMPORTANT:
+  - Each browser/tab has its OWN wallet (needs own ETH)
+  - Passphrase must match exactly
+  - Messages poll every 2 seconds (not instant)
+  - "delivered" = confirmed on-chain</pre>
 
       <p style="color:var(--g);font-size:13px;margin-bottom:16px;margin-top:32px;letter-spacing:2px">// STACK</p>
 
@@ -351,7 +372,7 @@ const T = 'ghostnet', KR = 'room', KM = 'msg';
 const A = { T:'type', K:'kind', R:'roomId', N:'nick', S:'ts' };
 
 // ========== STATE ==========
-let wallet, pub, wc, room, seen = new Set(), timer;
+let wallet, pub, wc, room, seen = new Set(), timer, ttlTimer;
 
 // ========== CRYPTO ==========
 async function dk(pass, rid) {
@@ -470,7 +491,7 @@ function enterChat() {
   document.getElementById('room-name').textContent = room.name;
   document.getElementById('nick-label').textContent = room.nick + ' $';
   document.getElementById('msg-input').focus();
-  seen.clear();
+  seen.clear(); firstPoll = true;
   document.getElementById('messages').innerHTML = '';
   sysMsg(`CONNECTED TO "${room.name.toUpperCase()}" AS ${room.nick}`);
   sysMsg(`SELF-DESTRUCT: ${room.ttlHours}h // CIPHER: AES-256-GCM // POLL: 2s`);
@@ -478,7 +499,7 @@ function enterChat() {
   updTTL();
   poll();
   timer = setInterval(poll, 2000);
-  setInterval(updTTL, 1000);
+  ttlTimer = setInterval(updTTL, 1000);
 }
 
 function updTTL() {
@@ -506,23 +527,39 @@ function addMsg(nick, text, ts, own=false) {
 
 function scr() { const m=document.getElementById('messages'); m.scrollTop=m.scrollHeight; }
 
+let polling = false, firstPoll = true;
 async function poll() {
-  if (!room) return;
+  if (!room || polling) return;
+  polling = true;
   try {
     const r = await pub.buildQuery()
       .where(and([eq(A.T,T),eq(A.K,KM),eq(A.R,room.roomId)]))
       .withAttributes().withPayload().limit(200).fetch();
     const k = await dk(room.passphrase, room.roomId);
     const nm = [];
+    let decryptFails = 0;
     for (const e of r.entities) {
       if (seen.has(e.key)) continue;
-      seen.add(e.key);
       const a=am(e.attributes), p=dp(e.payload);
-      try { nm.push({ nick:a[A.N], text:await dec(p,k), ts:Number(a[A.S]) }); } catch{}
+      try {
+        const text = await dec(p,k);
+        seen.add(e.key);
+        nm.push({ nick:a[A.N], text, ts:Number(a[A.S]) });
+      } catch(err) {
+        decryptFails++;
+        console.warn('decrypt fail for entity', e.key, err);
+      }
     }
     nm.sort((a,b)=>a.ts-b.ts);
     for (const m of nm) addMsg(m.nick, m.text, m.ts, m.nick===room.nick);
+    if (firstPoll) {
+      firstPoll = false;
+      if (nm.length) sysMsg(`LOADED ${nm.length} MESSAGE${nm.length>1?'S':''}`);
+      else if (r.entities.length === 0) sysMsg('NO MESSAGES YET');
+      else if (decryptFails > 0) sysMsg(`FOUND ${r.entities.length} ENCRYPTED MESSAGE${r.entities.length>1?'S':''} — COULD NOT DECRYPT (WRONG PASSPHRASE?)`);
+    }
   } catch(e) { console.error('poll:',e); }
+  polling = false;
 }
 
 // ========== SEND ==========
@@ -547,11 +584,12 @@ window.doSend = async () => {
       expiresIn:ExpirationTime.fromHours(room.ttlHours),
     });
     seen.add(r.entityKey);
-    st.textContent='';
+    st.textContent='> delivered'; st.style.color='var(--gd)';
+    setTimeout(()=>{st.textContent='';},2000);
   } catch(e) {
-    st.textContent = e.message?.includes('insufficient') ? '> need testnet ETH' : '> send failed';
+    st.textContent = e.message?.includes('insufficient') ? '> need testnet ETH' : '> send failed: '+(e.shortMessage||e.message);
     st.style.color='#ff4444';
-    setTimeout(()=>{st.textContent='';},3000);
+    setTimeout(()=>{st.textContent='';},5000);
   }
 };
 
@@ -564,6 +602,8 @@ window.copyInvite = () => {
 // ========== LEAVE ==========
 window.leaveRoom = () => {
   if (timer) clearInterval(timer);
+  if (ttlTimer) clearInterval(ttlTimer);
+  polling = false;
   room=null; seen.clear();
   document.getElementById('chat-view').classList.add('hidden');
   document.getElementById('chat-view').style.display='none';

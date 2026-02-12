@@ -76,56 +76,63 @@ npx tsx src/cli.ts rooms
 
 ---
 
-## Testing Guide — How to Test with Friends
+## Testing Guide
 
 ### Prerequisites
-- Modern browser (Chrome, Firefox, Safari, Edge)
-- ~30 seconds to get testnet ETH from faucet
+- Modern browser (Chrome/Firefox/Safari/Edge)
+- ~30s to get testnet ETH per wallet
 
-### Step-by-step
+### Two-Browser Test (solo or with friend)
 
-**Person 1 (Room Creator):**
-1. Open `chat.html` (local file or GitHub Pages URL)
-2. Click "get testnet ETH" → complete CAPTCHA → wait ~10s
-3. Click **Create Room**
-4. Fill in: room name, passphrase, your nick, TTL
-5. Click **CREATE ROOM** → you're in the chat
-6. Click **INVITE** → link copied to clipboard
-7. Send invite link to friends (any messenger — link contains roomId + passphrase)
+> **Key: each browser tab has its own wallet. Both wallets need testnet ETH.**
 
-**Person 2+ (Joiners):**
-1. Click the invite link → chat.html opens with room pre-filled
-2. Click "get testnet ETH" → complete CAPTCHA (first time only)
-3. Enter your nick → click **JOIN ROOM**
-4. You're in → messages appear in real-time (2s poll)
+**Tab 1 — Creator:**
+1. Open `chat.html` (local or GitHub Pages)
+2. Click **GET TESTNET ETH** → CAPTCHA → wait ~10s
+3. **CREATE ROOM** → name, passphrase, nick, TTL
+4. Click **INVITE** → link copied
 
-### What to Verify
-- [ ] Messages appear on both sides within 2-4 seconds
-- [ ] Message timestamps are correct
-- [ ] Wrong passphrase shows no messages (try joining with wrong pass)
-- [ ] Room name and TTL countdown display correctly
-- [ ] Invite link works (auto-fills room ID + passphrase)
-- [ ] After TTL expires, room and messages disappear from Arkiv
+**Tab 2 — Joiner (incognito or different browser):**
+1. Open invite link (room ID + passphrase auto-fill)
+2. Click **GET TESTNET ETH** → fund THIS wallet too
+3. Enter nick → **JOIN ROOM**
 
-### CLI Test Sequence
+**Verify:**
+- [ ] Both see "CONNECTED TO..." + system messages
+- [ ] Tab 1 sends msg → green locally + "delivered" status
+- [ ] Tab 2 sees msg in 2-4s (gray text)
+- [ ] Tab 2 replies → Tab 1 sees it in 2-4s
+- [ ] Join with wrong passphrase → "COULD NOT DECRYPT" warning
+- [ ] Initial join shows "LOADED N MESSAGES" or "NO MESSAGES YET"
+- [ ] After TTL → room + msgs auto-purge from Arkiv
+
+### CLI Test
 ```bash
-# Terminal 1
-export GHOSTNET_PRIVATE_KEY=0x...
+# Terminal 1: create room
+export GHOSTNET_PRIVATE_KEY=0x...  # funded wallet
 npx tsx src/cli.ts create --name="test" --ttl=1 --nick=alice --pass=s3cret
-# → note the roomId
+# → note roomId
 
-# Terminal 2 (can be different machine)
-export GHOSTNET_PRIVATE_KEY=0x...  # different key, funded
-npx tsx src/cli.ts send --room=ROOM_ID --pass=s3cret --nick=bob --msg="hey alice"
+# Terminal 2: send message (different funded wallet)
+export GHOSTNET_PRIVATE_KEY=0x...
+npx tsx src/cli.ts send --room=ROOM_ID --pass=s3cret --nick=bob --msg="hey"
 
-# Terminal 1
+# Terminal 1: read
 npx tsx src/cli.ts read --room=ROOM_ID --pass=s3cret
-# → [time] bob: hey alice
+# → [time] bob: hey
 
-# Wrong passphrase test
+# Wrong passphrase → no messages
 npx tsx src/cli.ts read --room=ROOM_ID --pass=wrong
-# → No messages (or wrong passphrase).
 ```
+
+### Common Issues
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| "insufficient funds" | Wallet not funded | Click GET TESTNET ETH (each tab needs own funding) |
+| No messages appear | Wrong passphrase | Passphrase must match exactly (case-sensitive) |
+| "COULD NOT DECRYPT" | Passphrase mismatch | Re-join with correct passphrase |
+| Room not found | TTL expired or wrong ID | Create new room |
+| Messages delayed >5s | Arkiv indexing lag | Normal on testnet, retry |
 
 ---
 

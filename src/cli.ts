@@ -81,7 +81,7 @@ async function main() {
       const rooms = await queryRooms(Number(flag('limit') ?? 20));
       if (!rooms.length) { console.log('No active rooms.'); break; }
       console.table(rooms.map(r => ({
-        roomId: r.roomId.slice(0, 8) + '...',
+        roomId: r.roomId,
         name: r.name,
         by: r.createdBy,
         ttl: r.ttlHours + 'h',
