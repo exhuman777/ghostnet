@@ -427,6 +427,7 @@ function b64d(s) { return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
 
 // ========== WALLET ==========
 const MENDOZA_CHAIN_ID = '0xe01c7e440';
+const MENDOZA_CHAIN_IDS = new Set([MENDOZA_CHAIN_ID, '0xe0087f840']); // accept known Arkiv chain IDs
 
 function setWalletInfo(address) {
   const info = document.getElementById('wallet-info');
@@ -502,7 +503,7 @@ function setupMetaMaskListeners() {
   });
 
   window.ethereum.on('chainChanged', (chainId) => {
-    if (chainId !== MENDOZA_CHAIN_ID) {
+    if (!MENDOZA_CHAIN_IDS.has(chainId)) {
       wrongChain = true;
       if (room) {
         sysMsg('WARNING: WRONG CHAIN DETECTED — SWITCH TO MENDOZA');
@@ -532,7 +533,7 @@ window.connectWallet = async () => {
     const accounts = await window.ethereum.request({ method:'eth_requestAccounts' });
     const address = accounts[0];
 
-    // switch/add Mendoza chain
+    // switch/add Mendoza chain (best-effort — don't block connection)
     try {
       await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:MENDOZA_CHAIN_ID }] });
     } catch(switchErr) {
@@ -546,14 +547,13 @@ window.connectWallet = async () => {
             blockExplorerUrls: ['https://explorer.mendoza.hoodi.arkiv.network']
           }] });
         } catch(addErr) {
-          // RPC conflict with existing chain — try switch again, may have been added under different name
-          try {
-            await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:MENDOZA_CHAIN_ID }] });
-          } catch(retryErr) {
-            throw new Error('CHAIN CONFLICT: Remove duplicate Arkiv network from MetaMask (Settings > Networks) then retry');
-          }
+          // RPC conflict with existing Arkiv chain — proceed, user is likely on correct network already
+          console.warn('chain add failed (RPC conflict), proceeding:', addErr.message);
         }
-      } else throw switchErr;
+      } else if (switchErr.code !== 4001) {
+        // non-rejection error — proceed anyway
+        console.warn('chain switch failed, proceeding:', switchErr.message);
+      } else throw switchErr; // user rejected — do block
     }
 
     wallet = { addr: address };
