@@ -7,7 +7,32 @@
  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝╚══════╝   ╚═╝
 ```
 
-# GhostNet — Ephemeral Encrypted Chat on Arkiv L3
+<p align="center">
+  <strong>GhostNet</strong>
+</p>
+
+<p align="center">
+  <em>Ephemeral Encrypted Chat on Arkiv L3</em>
+</p>
+
+<p align="center">
+  <a href="chat.html">Chat UI</a> &middot;
+  <a href="about.html">Deep Dive</a> &middot;
+  <a href="#cli">CLI</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/chain-Arkiv%20L3-purple" alt="Arkiv L3" />
+  <img src="https://img.shields.io/badge/encryption-ChaCha20----Poly1305-brightgreen" alt="ChaCha20--Poly1305" />
+  <img src="https://img.shields.io/badge/DMs-Noise%20K-blue" alt="Noise K" />
+  <img src="https://img.shields.io/badge/metadata-v3%20zero----plaintext-orange" alt="v3 zero--plaintext" />
+</p>
+
+---
+
+**No server. No backend. No database. No trust required.**
+
+Every message encrypted client-side with ChaCha20-Poly1305. Every on-chain attribute an opaque BLAKE2b hash. Messages self-destruct in 5 minutes. Your identity derived from your ETH wallet via X25519. DMs use Noise K protocol, recipient-only decryption.
 
 > Self-destructing chat rooms with AES-256-GCM encryption. Zero servers. Zero accounts. Zero trace.
 
